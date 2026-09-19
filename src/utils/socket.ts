@@ -18,4 +18,30 @@ export function getSocket(): Socket {
   return socket;
 }
 
+// Identificador anônimo do jogador neste navegador/aba.
+// É enviado ao servidor ao criar/entrar em uma sala e serve para o jogador
+// recuperar a PRÓPRIA vaga se a conexão cair ou a página for recarregada,
+// sem que outro aluno consiga assumir a vez dele apenas digitando o mesmo nome.
+// (sessionStorage = uma identidade por aba; abas diferentes não se confundem.)
+let memoryToken: string | null = null;
+
+export function getPlayerToken(): string {
+  const generate = () =>
+    typeof crypto !== 'undefined' && 'randomUUID' in crypto
+      ? crypto.randomUUID()
+      : `${Date.now()}-${Math.random().toString(36).slice(2)}-${Math.random().toString(36).slice(2)}`;
+
+  try {
+    let token = sessionStorage.getItem('mj_player_token');
+    if (!token) {
+      token = generate();
+      sessionStorage.setItem('mj_player_token', token);
+    }
+    return token;
+  } catch {
+    if (!memoryToken) memoryToken = generate();
+    return memoryToken;
+  }
+}
+
 export type { OnlinePlayer, OnlineRoom, ChatMessage };
