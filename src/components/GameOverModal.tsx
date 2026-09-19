@@ -15,10 +15,8 @@ import {
   Medal,
   Users,
   Music,
-  Volume2,
   Upload,
   Flame,
-  Zap,
   RefreshCw,
   Lock,
   Crown
@@ -104,14 +102,14 @@ export const GameOverModal: React.FC<GameOverModalProps> = ({
       (p) => (p.correctAnswersCount || 0) === maxCorrect
     );
 
-    // 3. Quem respondeu menos perguntas (pode haver empate)
+    // 3. Quem respondeu menos perguntas (pode haver empate) - Ajustado com segurança
     const minAnswered = players.length > 0 
-    ? Math.min(...players.map((p) => p.questionsAnsweredCount || 0)) 
-    : 0;
+      ? Math.min(...players.map((p) => p.questionsAnsweredCount || 0)) 
+      : 0;
 
-  const fewestAnsweredWinners = players.filter(
-  (p) => (p.questionsAnsweredCount || 0) === minAnswered
-);
+    const fewestAnsweredWinners = players.filter(
+      (p) => (p.questionsAnsweredCount || 0) === minAnswered
+    );
 
     // Calculate final scores for each player
     const playersWithScores = players.map((player) => {
@@ -174,16 +172,13 @@ export const GameOverModal: React.FC<GameOverModalProps> = ({
   }, [players]);
 
   const totalPlayersCount = evaluation.rankedDescending.length;
-  // Number of positions before the top 2 finalists (i.e. ranks 3, 4, ..., N)
   const bottomPositionsCount = Math.max(0, totalPlayersCount - 2);
 
-  // List of positions from rank 3 down to last place (index 2 to N-1)
   const bottomList = useMemo(() => {
     if (totalPlayersCount <= 2) return [];
     return evaluation.rankedDescending.slice(2);
   }, [evaluation.rankedDescending, totalPlayersCount]);
 
-  // Reset steps when modal opens and ensure music stops when closed
   useEffect(() => {
     if (isOpen) {
       setCurrentStep('bonus_most_answered');
@@ -202,7 +197,6 @@ export const GameOverModal: React.FC<GameOverModalProps> = ({
     };
   }, [isOpen]);
 
-  // Trigger celebration when 1st and 2nd place are revealed together
   const triggerChampionCelebration = () => {
     setIsPlayingSenna(true);
     sound.playSennaVictoryTheme(() => {
@@ -237,7 +231,6 @@ export const GameOverModal: React.FC<GameOverModalProps> = ({
     } catch {}
   };
 
-  // Toggle button handler for replaying or pausing the Senna victory theme
   const handleToggleSennaMusic = () => {
     if (isPlayingSenna) {
       sound.stopSennaVictoryTheme();
@@ -250,7 +243,6 @@ export const GameOverModal: React.FC<GameOverModalProps> = ({
     }
   };
 
-  // Custom audio upload handler
   const handleAudioFileUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
     if (file) {
@@ -264,7 +256,6 @@ export const GameOverModal: React.FC<GameOverModalProps> = ({
     }
   };
 
-  // Reset to original Senna track
   const handleResetDefaultAudio = () => {
     sound.setCustomVictoryAudio(null);
     setCustomAudioName(null);
@@ -275,14 +266,12 @@ export const GameOverModal: React.FC<GameOverModalProps> = ({
     }
   };
 
-  // Helper to change ceremony step and notify online peers if host
   const changeStep = (newStep: CeremonyStep) => {
     if (isOnline && !isHost) return;
     setCurrentStep(newStep);
     onCeremonyStepChange?.(newStep, bottomRevealedCount, areFinalistsRevealed);
   };
 
-  // Reveal next position from BOTTOM to TOP
   const handleRevealNext = () => {
     if (bottomRevealedCount < bottomPositionsCount) {
       const nextCount = bottomRevealedCount + 1;
@@ -290,12 +279,10 @@ export const GameOverModal: React.FC<GameOverModalProps> = ({
       sound.playRevealSound(nextCount);
       onCeremonyStepChange?.(currentStep, nextCount, areFinalistsRevealed);
     } else if (!areFinalistsRevealed) {
-      // Ready to reveal finalists together
       handleRevealFinalistsTogether();
     }
   };
 
-  // Reveal 1st and 2nd place TOGETHER with suspense
   const handleRevealFinalistsTogether = () => {
     if (isSuspenseLoading || areFinalistsRevealed) return;
     setIsSuspenseLoading(true);
@@ -312,7 +299,6 @@ export const GameOverModal: React.FC<GameOverModalProps> = ({
     }, 2200);
   };
 
-  // Handler to reveal all positions at once
   const handleRevealAll = () => {
     setBottomRevealedCount(bottomPositionsCount);
     setAreFinalistsRevealed(true);
@@ -325,7 +311,6 @@ export const GameOverModal: React.FC<GameOverModalProps> = ({
 
   if (!isOpen) return null;
 
-  // The 1st and 2nd finalists
   const firstPlace = evaluation.rankedDescending[0];
   const secondPlace = evaluation.rankedDescending[1];
 
@@ -336,10 +321,8 @@ export const GameOverModal: React.FC<GameOverModalProps> = ({
         animate={{ scale: 1, opacity: 1, y: 0 }}
         className="w-full max-w-5xl bg-slate-900 border-2 border-amber-500/40 rounded-2xl sm:rounded-3xl shadow-2xl overflow-hidden my-auto p-3 sm:p-4.5 relative flex flex-col justify-between max-h-[96vh]"
       >
-        {/* Ambient Top Glow */}
         <div className="absolute top-0 left-1/2 -translate-x-1/2 w-4/5 h-24 bg-gradient-to-b from-amber-500/15 via-yellow-500/5 to-transparent blur-2xl pointer-events-none" />
 
-        {/* Hidden File Input for Custom Audio */}
         <input 
           type="file" 
           ref={fileInputRef} 
@@ -348,11 +331,10 @@ export const GameOverModal: React.FC<GameOverModalProps> = ({
           className="hidden" 
         />
 
-        {/* Compact Header with Steps Progress */}
         <div className="text-center space-y-1.5 mb-2.5 flex-shrink-0 relative z-10">
           <div className="flex items-center justify-between gap-2 px-1">
             <CesurgLogo height={32} className="opacity-95 drop-shadow-sm flex-shrink-0" />
-            
+             
             <div className="inline-flex items-center gap-1.5 px-3 py-0.5 rounded-full bg-[#20140D] border border-amber-400/40 text-amber-300 text-[11px] font-medium shadow-sm">
               <Scale className="w-3 h-3 text-amber-400" />
               <span>Prática do Trabalho <span className="text-amber-500/50 mx-1">•</span> Prof. Ma. Giulia Signor</span>
@@ -364,7 +346,6 @@ export const GameOverModal: React.FC<GameOverModalProps> = ({
             </div>
           </div>
 
-          {/* Stepper Tabs */}
           <div className="grid grid-cols-4 gap-1 sm:gap-1.5 max-w-2xl mx-auto pt-0.5">
             <button
               type="button"
@@ -420,10 +401,8 @@ export const GameOverModal: React.FC<GameOverModalProps> = ({
           </div>
         </div>
 
-        {/* Dynamic Content Body Based on Current Step */}
         <div className="flex-1 min-h-0 overflow-y-auto px-1 py-1 relative z-10">
           <AnimatePresence mode="wait">
-            {/* STEP 1: QUEM RESPONDEU MAIS PERGUNTAS (+15 pts) */}
             {currentStep === 'bonus_most_answered' && (
               <motion.div
                 key="step-bonus-1"
@@ -514,7 +493,6 @@ export const GameOverModal: React.FC<GameOverModalProps> = ({
               </motion.div>
             )}
 
-            {/* STEP 2: QUEM ACERTOU MAIS PERGUNTAS (+15 pts) */}
             {currentStep === 'bonus_most_correct' && (
               <motion.div
                 key="step-bonus-2"
@@ -605,7 +583,6 @@ export const GameOverModal: React.FC<GameOverModalProps> = ({
               </motion.div>
             )}
 
-            {/* STEP 3: QUEM RESPONDEU MENOS PERGUNTAS (+15 pts) */}
             {currentStep === 'bonus_fewest_answered' && (
               <motion.div
                 key="step-bonus-3"
@@ -697,7 +674,6 @@ export const GameOverModal: React.FC<GameOverModalProps> = ({
               </motion.div>
             )}
 
-            {/* STEP 4: REVELAÇÃO DO RANKING (DE BAIXO PARA CIMA + 1º E 2º JUNTOS + SEM SCROLL) */}
             {currentStep === 'ranking_reveal' && (
               <motion.div
                 key="step-ranking-reveal"
@@ -705,7 +681,6 @@ export const GameOverModal: React.FC<GameOverModalProps> = ({
                 animate={{ opacity: 1, y: 0 }}
                 className="space-y-2 py-0.5"
               >
-                {/* Ranking Title & Controls Bar */}
                 <div className="flex flex-col sm:flex-row items-center justify-between gap-1.5 border-b border-slate-800 pb-2">
                   <div className="text-center sm:text-left">
                     <h3 className="text-base sm:text-lg font-black text-white font-display flex items-center gap-1.5 justify-center sm:justify-start">
@@ -721,7 +696,6 @@ export const GameOverModal: React.FC<GameOverModalProps> = ({
                     </p>
                   </div>
 
-                  {/* Action Buttons */}
                   <div className="flex items-center gap-1.5 flex-wrap justify-center">
                     {isOnline && !isHost ? (
                       <div className="px-3.5 py-1.5 rounded-xl bg-amber-500/15 border border-amber-400/40 text-amber-300 text-xs font-semibold flex items-center gap-1.5">
@@ -747,7 +721,6 @@ export const GameOverModal: React.FC<GameOverModalProps> = ({
                             </span>
                           </button>
                         ) : (
-                          /* DUAL REVEAL SUSPENSE BUTTON FOR 1ST AND 2ND PLACE */
                           <button
                             type="button"
                             id="btn-reveal-finalists-together"
@@ -777,7 +750,6 @@ export const GameOverModal: React.FC<GameOverModalProps> = ({
                           <span>Pódio consagrado com sucesso!</span>
                         </div>
 
-                        {/* Music Replay / Pause Button */}
                         <button
                           type="button"
                           id="btn-toggle-senna-theme-header"
@@ -797,9 +769,6 @@ export const GameOverModal: React.FC<GameOverModalProps> = ({
                   </div>
                 </div>
 
-                {/* ========================================================================= */}
-                {/* 1º E 2º COLOCADOS SPOTLIGHT (REVELADOS JUNTOS COM SUSPENSE) */}
-                {/* ========================================================================= */}
                 {areFinalistsRevealed ? (
                   <motion.div
                     initial={{ scale: 0.94, opacity: 0, y: -10 }}
@@ -807,12 +776,10 @@ export const GameOverModal: React.FC<GameOverModalProps> = ({
                     transition={{ duration: 0.5, type: 'spring', stiffness: 200 }}
                     className="grid grid-cols-1 sm:grid-cols-2 gap-2 sm:gap-3"
                   >
-                    {/* 🥇 1º LUGAR - GRANDE CAMPEÃO (GOLD) */}
                     <div className="p-2.5 sm:p-3 rounded-2xl bg-gradient-to-br from-amber-500/25 via-yellow-500/15 to-slate-900 border-2 border-amber-400 shadow-xl relative overflow-hidden flex flex-col justify-between">
                       <div className="absolute -top-6 -right-6 w-24 h-24 bg-amber-400/15 rounded-full blur-xl pointer-events-none" />
 
                       <div>
-                        {/* Title Badge */}
                         <div className="flex items-center justify-between gap-1.5 mb-1.5">
                           <div className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full bg-amber-400 text-slate-950 text-[10px] font-black uppercase tracking-wider shadow-sm">
                             <Crown className="w-3 h-3 fill-slate-950" />
@@ -824,69 +791,62 @@ export const GameOverModal: React.FC<GameOverModalProps> = ({
                           </span>
                         </div>
 
-                        {/* Player Info */}
                         <div className="flex items-center gap-2.5">
                           <div
                             className="w-10 h-10 sm:w-11 sm:h-11 rounded-xl flex items-center justify-center text-xl shadow-md border-2 border-amber-300 flex-shrink-0"
-                            style={{ backgroundColor: firstPlace.color }}
+                            style={{ backgroundColor: firstPlace?.color }}
                           >
-                            {firstPlace.avatar}
+                            {firstPlace?.avatar}
                           </div>
 
                           <div className="min-w-0 flex-1">
                             <h4 className="text-sm sm:text-base font-black text-white truncate font-display">
-                              {firstPlace.name}
+                              {firstPlace?.name}
                             </h4>
                             <p className="text-[10px] text-slate-300 truncate">
-                              {firstPlace.role || 'Jurista Trabalhista'}
+                              {firstPlace?.role || 'Jurista Trabalhista'}
                             </p>
                           </div>
 
-                          {/* Final Score */}
                           <div className="text-right bg-slate-900/90 px-2.5 py-1 rounded-xl border border-amber-400/50 flex-shrink-0">
                             <span className="text-[8px] text-slate-400 uppercase font-bold block leading-none">Pontuação Final</span>
                             <span className="text-base sm:text-lg font-black text-amber-400 leading-none mt-0.5 block font-display">
-                              {firstPlace.totalFinalScore} pts
+                              {firstPlace?.totalFinalScore} pts
                             </span>
                           </div>
                         </div>
 
-                        {/* Bonuses Breakdown */}
                         <div className="mt-2 pt-2 border-t border-amber-500/20 flex items-center justify-between gap-1 flex-wrap">
                           <div className="flex items-center gap-1 flex-wrap">
                             <span className="text-[9px] text-slate-400 font-bold uppercase">Bônus:</span>
-                            {firstPlace.finishBonus > 0 && (
+                            {firstPlace?.finishBonus > 0 && (
                               <span className="text-[9px] px-1.5 py-0.2 rounded bg-amber-500/25 text-amber-300 font-bold border border-amber-500/35">
                                 +{firstPlace.finishBonus} Chegada
                               </span>
                             )}
-                            {firstPlace.gotMostAnswered && (
+                            {firstPlace?.gotMostAnswered && (
                               <span className="text-[9px] px-1.5 py-0.2 rounded bg-amber-500/25 text-amber-300 font-bold border border-amber-500/35">
                                 +15 Mais Perguntas
                               </span>
                             )}
-                            {firstPlace.gotMostCorrect && (
+                            {firstPlace?.gotMostCorrect && (
                               <span className="text-[9px] px-1.5 py-0.2 rounded bg-emerald-500/25 text-emerald-300 font-bold border border-emerald-500/35">
                                 +15 Mais Acertos
                               </span>
                             )}
-                            {firstPlace.gotFewestAnswered && (
+                            {firstPlace?.gotFewestAnswered && (
                               <span className="text-[9px] px-1.5 py-0.2 rounded bg-cyan-500/25 text-cyan-300 font-bold border border-cyan-500/35">
                                 +15 Menos Perguntas
                               </span>
                             )}
-                            {firstPlace.finishBonus === 0 && firstPlace.totalBonusPts === 0 && (
-                              <span className="text-[9px] text-slate-500 italic">Sem bônus extras</span>
-                            )}
                           </div>
 
                           <span className="text-[9px] text-slate-400">
-                            ({firstPlace.points} tab. + {firstPlace.finishBonus + firstPlace.totalBonusPts} bônus)
+                            ({firstPlace?.points} tab. + {firstPlace?.finishBonus + firstPlace?.totalBonusPts} bônus)
                           </span>
                         </div>
                       </div>
 
-                      {/* Music & Audio Customization Controls */}
                       <div className="mt-2 pt-1.5 border-t border-amber-500/20 flex items-center justify-between gap-2 flex-wrap text-[10px]">
                         <button
                           type="button"
@@ -906,7 +866,6 @@ export const GameOverModal: React.FC<GameOverModalProps> = ({
                             type="button"
                             onClick={() => fileInputRef.current?.click()}
                             className="text-[9px] text-slate-400 hover:text-amber-300 underline inline-flex items-center gap-0.5 cursor-pointer"
-                            title="Carregar arquivo MP3 próprio"
                           >
                             <Upload className="w-2.5 h-2.5" />
                             <span>{customAudioName ? 'Trocar MP3' : 'Usar outro áudio'}</span>
@@ -917,7 +876,6 @@ export const GameOverModal: React.FC<GameOverModalProps> = ({
                               type="button"
                               onClick={handleResetDefaultAudio}
                               className="text-[9px] text-slate-400 hover:text-rose-300 underline inline-flex items-center gap-0.5 cursor-pointer ml-1"
-                              title="Restaurar áudio oficial"
                             >
                               <RefreshCw className="w-2.5 h-2.5" />
                               <span>Restaurar</span>
@@ -927,12 +885,10 @@ export const GameOverModal: React.FC<GameOverModalProps> = ({
                       </div>
                     </div>
 
-                    {/* 🥈 2º LUGAR - VICE-CAMPEÃO (SILVER) */}
                     <div className="p-2.5 sm:p-3 rounded-2xl bg-gradient-to-br from-slate-700/30 via-slate-800/40 to-slate-900 border-2 border-slate-300/80 shadow-xl relative overflow-hidden flex flex-col justify-between">
                       <div className="absolute -top-6 -right-6 w-24 h-24 bg-slate-300/10 rounded-full blur-xl pointer-events-none" />
 
                       <div>
-                        {/* Title Badge */}
                         <div className="flex items-center justify-between gap-1.5 mb-1.5">
                           <div className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full bg-slate-200 text-slate-950 text-[10px] font-black uppercase tracking-wider shadow-sm">
                             <Medal className="w-3 h-3 fill-slate-950" />
@@ -944,77 +900,69 @@ export const GameOverModal: React.FC<GameOverModalProps> = ({
                           </span>
                         </div>
 
-                        {/* Player Info */}
                         <div className="flex items-center gap-2.5">
                           <div
                             className="w-10 h-10 sm:w-11 sm:h-11 rounded-xl flex items-center justify-center text-xl shadow-md border-2 border-slate-300 flex-shrink-0"
-                            style={{ backgroundColor: secondPlace.color }}
+                            style={{ backgroundColor: secondPlace?.color }}
                           >
-                            {secondPlace.avatar}
+                            {secondPlace?.avatar}
                           </div>
 
                           <div className="min-w-0 flex-1">
                             <h4 className="text-sm sm:text-base font-black text-white truncate font-display">
-                              {secondPlace.name}
+                              {secondPlace?.name}
                             </h4>
                             <p className="text-[10px] text-slate-300 truncate">
-                              {secondPlace.role || 'Jurista Trabalhista'}
+                              {secondPlace?.role || 'Jurista Trabalhista'}
                             </p>
                           </div>
 
-                          {/* Final Score */}
                           <div className="text-right bg-slate-900/90 px-2.5 py-1 rounded-xl border border-slate-400/50 flex-shrink-0">
                             <span className="text-[8px] text-slate-400 uppercase font-bold block leading-none">Pontuação Final</span>
                             <span className="text-base sm:text-lg font-black text-slate-200 leading-none mt-0.5 block font-display">
-                              {secondPlace.totalFinalScore} pts
+                              {secondPlace?.totalFinalScore} pts
                             </span>
                           </div>
                         </div>
 
-                        {/* Bonuses Breakdown */}
                         <div className="mt-2 pt-2 border-t border-slate-700/60 flex items-center justify-between gap-1 flex-wrap">
                           <div className="flex items-center gap-1 flex-wrap">
                             <span className="text-[9px] text-slate-400 font-bold uppercase">Bônus:</span>
-                            {secondPlace.finishBonus > 0 && (
+                            {secondPlace?.finishBonus > 0 && (
                               <span className="text-[9px] px-1.5 py-0.2 rounded bg-slate-700/50 text-slate-200 font-bold border border-slate-600">
                                 +{secondPlace.finishBonus} Chegada
                               </span>
                             )}
-                            {secondPlace.gotMostAnswered && (
+                            {secondPlace?.gotMostAnswered && (
                               <span className="text-[9px] px-1.5 py-0.2 rounded bg-amber-500/25 text-amber-300 font-bold border border-amber-500/35">
                                 +15 Mais Perguntas
                               </span>
                             )}
-                            {secondPlace.gotMostCorrect && (
+                            {secondPlace?.gotMostCorrect && (
                               <span className="text-[9px] px-1.5 py-0.2 rounded bg-emerald-500/25 text-emerald-300 font-bold border border-emerald-500/35">
                                 +15 Mais Acertos
                               </span>
                             )}
-                            {secondPlace.gotFewestAnswered && (
+                            {secondPlace?.gotFewestAnswered && (
                               <span className="text-[9px] px-1.5 py-0.2 rounded bg-cyan-500/25 text-cyan-300 font-bold border border-cyan-500/35">
                                 +15 Menos Perguntas
                               </span>
                             )}
-                            {secondPlace.finishBonus === 0 && secondPlace.totalBonusPts === 0 && (
-                              <span className="text-[9px] text-slate-500 italic">Sem bônus extras</span>
-                            )}
                           </div>
 
                           <span className="text-[9px] text-slate-400">
-                            ({secondPlace.points} tab. + {secondPlace.finishBonus + secondPlace.totalBonusPts} bônus)
+                            ({secondPlace?.points} tab. + {secondPlace?.finishBonus + secondPlace?.totalBonusPts} bônus)
                           </span>
                         </div>
                       </div>
 
-                      {/* Vice-Champion Honor Note */}
                       <div className="mt-2 pt-1.5 border-t border-slate-700/60 flex items-center justify-between text-[10px] text-slate-400">
                         <span>Desempenho de excelência jurídica</span>
-                        <span className="font-bold text-slate-300">Diferença: {firstPlace.totalFinalScore - secondPlace.totalFinalScore} pts</span>
+                        <span className="font-bold text-slate-300">Diferença: {(firstPlace?.totalFinalScore || 0) - (secondPlace?.totalFinalScore || 0)} pts</span>
                       </div>
                     </div>
                   </motion.div>
                 ) : isSuspenseLoading ? (
-                  /* SUSPENSE ACTIVE COUNTDOWN PANEL */
                   <motion.div
                     initial={{ scale: 0.95, opacity: 0 }}
                     animate={{ scale: 1, opacity: 1 }}
@@ -1033,7 +981,6 @@ export const GameOverModal: React.FC<GameOverModalProps> = ({
                     </p>
                   </motion.div>
                 ) : (
-                  /* FINALISTS TEASER CARD (NOT YET REVEALED) */
                   <div className="p-3 rounded-2xl bg-slate-900/60 border border-dashed border-amber-500/40 text-center flex flex-col sm:flex-row items-center justify-between gap-2">
                     <div className="flex items-center gap-2 text-left">
                       <div className="w-8 h-8 rounded-xl bg-amber-500/20 text-amber-400 flex items-center justify-center flex-shrink-0">
@@ -1059,10 +1006,6 @@ export const GameOverModal: React.FC<GameOverModalProps> = ({
                   </div>
                 )}
 
-                {/* ========================================================================= */}
-                {/* DEMAIS COLOCADOS (DO 3º AO ÚLTIMO) REVELADOS DE BAIXO PARA CIMA */}
-                {/* SEM NECESSIDADE DE SCROLL - GRADE RESPONSIVA COMPACTA */}
-                {/* ========================================================================= */}
                 {bottomList.length > 0 && (
                   <div className="space-y-1 pt-1">
                     <div className="flex items-center justify-between text-[11px] text-slate-400 px-1">
@@ -1075,7 +1018,6 @@ export const GameOverModal: React.FC<GameOverModalProps> = ({
                       </span>
                     </div>
 
-                    {/* Compact responsive grid: fits nicely without vertical scroll */}
                     <div className={`grid gap-1.5 ${
                       bottomList.length <= 3 
                         ? 'grid-cols-1 sm:grid-cols-3' 
@@ -1084,8 +1026,7 @@ export const GameOverModal: React.FC<GameOverModalProps> = ({
                         : 'grid-cols-1 sm:grid-cols-2 lg:grid-cols-3'
                     }`}>
                       {bottomList.map((player, idx) => {
-                        const rankNumber = idx + 3; // index 0 in bottomList is 3rd place
-                        // Order from bottom: last place has offset 0, 3rd place has offset bottomPositionsCount - 1
+                        const rankNumber = idx + 3;
                         const isRevealed = (bottomPositionsCount - 1 - idx) < bottomRevealedCount || areFinalistsRevealed;
                         const isBronze = rankNumber === 3;
 
@@ -1119,7 +1060,6 @@ export const GameOverModal: React.FC<GameOverModalProps> = ({
                                 : 'bg-slate-800/40 border-slate-800/90'
                             }`}
                           >
-                            {/* Left: Rank + Avatar + Name */}
                             <div className="flex items-center gap-2 min-w-0 flex-1">
                               <span
                                 className={`w-6 h-6 rounded-md text-[11px] font-black flex items-center justify-center flex-shrink-0 shadow border ${
@@ -1164,7 +1104,6 @@ export const GameOverModal: React.FC<GameOverModalProps> = ({
                               </div>
                             </div>
 
-                            {/* Right: Final Score */}
                             <div className="text-right flex-shrink-0 pl-1">
                               <span className={`text-xs sm:text-sm font-black block leading-none ${
                                 isBronze ? 'text-amber-400' : 'text-slate-200'
@@ -1186,9 +1125,7 @@ export const GameOverModal: React.FC<GameOverModalProps> = ({
           </AnimatePresence>
         </div>
 
-        {/* Compact Footer Navigation & Restart Actions */}
         <div className="border-t border-slate-800 pt-2.5 mt-1.5 flex flex-wrap items-center justify-between gap-2 flex-shrink-0 relative z-10">
-          {/* Back to Bonus Ceremony Button */}
           {currentStep === 'ranking_reveal' ? (
             <button
               type="button"
@@ -1206,7 +1143,6 @@ export const GameOverModal: React.FC<GameOverModalProps> = ({
             </div>
           )}
 
-          {/* Restart Button & Credits */}
           <div className="flex items-center gap-2.5">
             <span className="text-[10px] text-slate-500 hidden sm:inline select-none">
               designed by <strong className="text-amber-400/90 font-semibold">@jlima.trafego</strong>
