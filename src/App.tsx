@@ -434,36 +434,7 @@ export default function App() {
         }
       });
 
-      // 2. Se o socket oscilar e não confirmar em 1.5s, aciona o fallback HTTP REST instantâneo
-      const fallbackTimer = setTimeout(async () => {
-        if (settled) return;
-
-        // Se a sala já foi atualizada nesse meio tempo, considera resolvido
-        if (onlineRoomRef.current?.activeQuestionAnswer) {
-          finishSuccess();
-          return;
-        }
-
-        try {
-          const resp = await fetch(`/api/rooms/${encodeURIComponent(onlineRoom.roomId)}/answer`, {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify(payload),
-          });
-          const data = await resp.json();
-          if (data && data.ok) {
-            finishSuccess();
-          } else {
-            finishError(data?.error || 'Não foi possível confirmar a resposta.');
-          }
-        } catch {
-          if (onlineRoomRef.current?.activeQuestionAnswer) {
-            finishSuccess();
-          } else {
-            finishError('Sem resposta do servidor. Confira a conexão e tente de novo.');
-          }
-        }
-      }, 1500);
+      
     });
 
   const handleContinueOnline = () => {
