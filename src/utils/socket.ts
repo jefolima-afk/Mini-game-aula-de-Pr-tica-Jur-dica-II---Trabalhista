@@ -13,9 +13,9 @@ export function getSocket(): Socket {
     socket = io(API_URL || undefined, {
       autoConnect: true,
       reconnection: true,
-      reconnectionAttempts: 10,
-      reconnectionDelay: 1000,
-      transports: ['websocket', 'polling'],
+      reconnectionAttempts: 15,
+      reconnectionDelay: 800,
+      transports: ['polling', 'websocket'],
     });
   }
 

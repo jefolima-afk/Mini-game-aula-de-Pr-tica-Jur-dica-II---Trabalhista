@@ -119,7 +119,7 @@ export const PlayersList: React.FC<PlayersListProps> = ({
                       )}
                     </div>
                     <span className="text-[9px] text-slate-400 truncate block leading-none">
-                      Casa {p.position} • {p.correctAnswersCount} acertos ({p.questionsAnsweredCount || 0} perg.)
+                      Casa {p.position === 1 ? '00' : p.position} • {p.correctAnswersCount} acertos ({p.questionsAnsweredCount || 0} perg.)
                     </span>
                   </div>
                 </div>

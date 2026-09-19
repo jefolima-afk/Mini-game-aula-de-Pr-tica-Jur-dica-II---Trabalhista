@@ -33,7 +33,7 @@ export const RulesModal: React.FC<RulesModalProps> = ({ isOpen, onClose }) => {
             <div>
               <h4 className="font-bold text-white mb-1">1. Tabuleiro de 35 Casas (1 a 35)</h4>
               <p className="text-slate-400 leading-relaxed">
-                • <strong>Casa 1:</strong> Ponto de Partida (0 pontos).<br />
+                • <strong>Casa 00:</strong> Ponto de Partida (0 pontos).<br />
                 • <strong>6 Casas Bônus:</strong> Casas 5, 10, 15, 20, 25 e 30.<br />
                 • <strong>27 Casas de Perguntas:</strong> Casas 2, 3, 4, 6, 7, 8, 9, 11, 12, 13, 14, 16, 17, 18, 19, 21, 22, 23, 24, 26, 27, 28, 29, 31, 32, 33 e 34.<br />
                 • <strong>Casa 35:</strong> Linha de Chegada com Superpergunta.

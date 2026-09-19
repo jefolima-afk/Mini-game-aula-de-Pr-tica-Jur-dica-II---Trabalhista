@@ -358,7 +358,24 @@ export default function App() {
       const explanation = matchedOption?.explanation || currentEvent.question.options.find((o) => o.isCorrect)?.explanation || '';
       const legalBasis = matchedOption?.legalBasis || currentEvent.legalContext || 'CLT/CF/88';
 
-      socket.timeout(12000).emit(
+      if (!socket.connected) {
+        socket.connect();
+      }
+
+      let settled = false;
+      const timeoutTimer = setTimeout(() => {
+        if (!settled) {
+          settled = true;
+          // Se a sala já foi atualizada com a resposta, considera sucesso
+          if (onlineRoomRef.current?.activeQuestionAnswer) {
+            resolve({ ok: true });
+          } else {
+            resolve({ ok: false, error: 'Sem resposta do servidor. Confira a conexão e tente de novo.' });
+          }
+        }
+      }, 10000);
+
+      socket.emit(
         'game:answer_question',
         {
           roomId: onlineRoom.roomId,
@@ -371,9 +388,12 @@ export default function App() {
           legalBasis,
           playerToken: getPlayerToken(),
         },
-        (err: Error | null, res?: { ok: boolean; error?: string }) => {
-          if (err) resolve({ ok: false, error: 'Sem resposta do servidor. Confira a conexão e tente de novo.' });
-          else resolve(res ?? { ok: true });
+        (res?: { ok: boolean; error?: string }) => {
+          if (!settled) {
+            settled = true;
+            clearTimeout(timeoutTimer);
+            resolve(res ?? { ok: true });
+          }
         }
       );
     });
@@ -563,6 +583,28 @@ export default function App() {
         onEnterOnlineGame={(room, player) => {
           setOnlineRoom(room);
           setMyOnlinePlayer(player);
+          setPlayers(
+            room.players.map((p) => ({
+              id: p.id,
+              name: p.name,
+              avatar: p.avatar,
+              color: p.color,
+              accentColor: p.accentColor,
+              role: p.role,
+              points: Number(p.points) || 0,
+              reputation: p.reputation,
+              position: p.position || 1,
+              isFinished: p.isFinished,
+              finishRank: p.finishRank,
+              skipNextTurn: p.skipNextTurn,
+              achievements: p.achievements || [],
+              questionsAnsweredCount: p.questionsAnsweredCount || 0,
+              correctAnswersCount: p.correctAnswersCount || 0,
+              bonusCount: p.bonusCount || 0,
+            }))
+          );
+          setActivePlayerIndex(room.activePlayerIndex || 0);
+          setRound(room.round || 1);
           setGameMode('online');
           setPhase('playing');
         }}
@@ -683,7 +725,7 @@ export default function App() {
           >
             <div className="flex items-center justify-between pb-2 border-b border-slate-800">
               <span className="text-xs font-bold text-amber-400 uppercase tracking-wider">
-                Casa #{inspectTile.id} da Trilha
+                Casa #{inspectTile.id === 1 ? '00' : inspectTile.id} da Trilha
               </span>
               <button
                 type="button"

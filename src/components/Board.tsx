@@ -77,7 +77,7 @@ export const Board: React.FC<BoardProps> = ({
         <div className="flex items-center gap-2 text-xs">
           <div className="flex items-center gap-1.5">
             <span className="w-2.5 h-2.5 rounded-full bg-emerald-400 shadow-sm shadow-emerald-500/50" />
-            <span className="font-bold text-emerald-300">Casa 1: Partida</span>
+            <span className="font-bold text-emerald-300">Casa 00: Partida</span>
           </div>
           <span className="text-slate-600">➔</span>
           <div className="flex items-center gap-1.5">
@@ -165,7 +165,7 @@ export const Board: React.FC<BoardProps> = ({
                           : hasActivePlayer
                           ? 'border-amber-400/90 bg-slate-800/95 shadow-md shadow-amber-500/20 ring-1 ring-amber-400/50 z-10'
                           : isBonus
-                          ? 'border-amber-400/80 bg-amber-950/30 shadow-sm shadow-amber-500/10'
+                          ? 'border-amber-400 bg-slate-800/40 hover:bg-slate-800/70 shadow-sm shadow-amber-500/10'
                           : isStart
                           ? 'border-emerald-500 bg-emerald-950/40 shadow-emerald-500/10'
                           : isFinish
@@ -180,17 +180,17 @@ export const Board: React.FC<BoardProps> = ({
                       {/* Top Bar: Tile Number & Icon */}
                       <div className="relative z-10 flex items-center justify-between gap-1 leading-none flex-shrink-0">
                         <span
-                          className={`w-4 h-4 sm:w-5 sm:h-5 rounded-full flex items-center justify-center font-display font-black text-[9px] sm:text-[11px] shadow-inner flex-shrink-0 ${
+                          className={`min-w-[20px] h-5 px-1 sm:min-w-[24px] sm:h-6 sm:px-1.5 rounded-full flex items-center justify-center font-display font-black text-[11px] sm:text-[12.5px] md:text-[13px] shadow-sm flex-shrink-0 leading-none ${
                             isStart
                               ? 'bg-emerald-500 text-slate-950'
                               : isFinish
                               ? 'bg-amber-400 text-slate-950 animate-bounce'
                               : isBonus
-                              ? 'bg-amber-400 text-slate-950 font-black'
+                              ? 'bg-slate-700 text-amber-300 border border-amber-400/60 font-black'
                               : 'bg-slate-700 text-slate-200'
                           }`}
                         >
-                          {tile.id}
+                          {isStart ? '00' : tile.id}
                         </span>
 
                         <div className="flex items-center gap-1">
