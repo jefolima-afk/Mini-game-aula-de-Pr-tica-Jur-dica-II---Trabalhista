@@ -4,9 +4,13 @@ import { OnlinePlayer, OnlineRoom, ChatMessage } from '../types';
 
 let socket: Socket | null = null;
 
+// URL do servidor multiplayer (ex.: https://seu-app.up.railway.app).
+// Vazio = mesma origem (útil quando front e servidor rodam juntos).
+export const API_URL: string = ((import.meta.env.VITE_API_URL as string | undefined) || '').replace(/\/+$/, '');
+
 export function getSocket(): Socket {
   if (!socket) {
-    socket = io(import.meta.env.VITE_API_URL, {
+    socket = io(API_URL || undefined, {
       autoConnect: true,
       reconnection: true,
       reconnectionAttempts: 10,
