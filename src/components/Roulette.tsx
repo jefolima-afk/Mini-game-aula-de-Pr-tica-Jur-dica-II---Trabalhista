@@ -49,7 +49,9 @@ export const Roulette: React.FC<RouletteProps> = ({
     };
   }, []);
 
-  const runSpinAnimation = (targetNum: number) => {
+  // notify=false: animação apenas visual (jogador observando a roleta de outro).
+  // Só quem realmente girou (notify=true) avisa o jogo do resultado.
+  const runSpinAnimation = (targetNum: number, notify: boolean = true) => {
     if (isSpinning) return;
 
     sound.playSpinStart();
@@ -95,9 +97,11 @@ export const Roulette: React.FC<RouletteProps> = ({
         setIsSpinning(false);
         setLastResult(targetNum);
         sound.playCashSound();
-        setTimeout(() => {
-          onSpinEnd(targetNum);
-        }, 650);
+        if (notify) {
+          setTimeout(() => {
+            onSpinEnd(targetNum);
+          }, 650);
+        }
       }
     };
 
@@ -107,7 +111,7 @@ export const Roulette: React.FC<RouletteProps> = ({
   // Trigger spin when externalSpinTarget arrives
   useEffect(() => {
     if (externalSpinTarget && !isSpinning) {
-      runSpinAnimation(externalSpinTarget);
+      runSpinAnimation(externalSpinTarget, false);
     }
   }, [externalSpinTarget]);
 
