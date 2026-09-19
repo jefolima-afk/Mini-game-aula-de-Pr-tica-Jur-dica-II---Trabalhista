@@ -24,7 +24,7 @@ import {
 } from 'lucide-react';
 import { CesurgLogo } from './CesurgLogo';
 import { OnlinePlayer, OnlineRoom, ChatMessage } from '../types';
-import { getSocket, getPlayerToken } from '../utils/socket';
+import { getSocket, getPlayerToken, API_URL } from '../utils/socket';
 import { sound } from '../utils/audio';
 
 const AVATARS = ['⚖️', '🏛️', '📜', '💼', '🎓', '🖋️', '🔍', '🏆', '👨‍⚖️', '👩‍⚖️', '📚', '⚡'];
@@ -134,7 +134,7 @@ export const OnlineLobby: React.FC<OnlineLobbyProps> = ({
   // Fetch Public Rooms
   const fetchPublicRooms = async () => {
     try {
-      const res = await fetch('/api/rooms');
+      const res = await fetch(`${API_URL}/api/rooms`);
       if (res.ok) {
         const data = await res.json();
         setPublicRooms(data.rooms || []);
