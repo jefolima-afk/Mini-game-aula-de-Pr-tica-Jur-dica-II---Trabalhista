@@ -333,32 +333,39 @@ export default function App() {
   // EVENT RESOLUTION (LOCAL & ONLINE)
   // ===========================================================================
   const handleSubmitOnlineAnswer = (optionId: string, optionText: string) =>
-  new Promise<{ ok: boolean; error?: string }>((resolve) => {
-    if (!onlineRoom || !currentEvent?.question) {
-      resolve({ ok: false, error: 'Pergunta indisponível. Aguarde a atualização da sala.' });
-      return;
-    }
-
-    const matchedOption = currentEvent.question.options.find(
-      (o) => o.id === optionId || o.text === optionId || o.text === optionText
-    );
-    const isCorrect = !!matchedOption?.isCorrect;
-    const pointsEarned = matchedOption ? currentEvent.question.pointsReward : 0;
-    const explanation =
-      matchedOption?.explanation ||
-      currentEvent.question.options.find((o) => o.isCorrect)?.explanation ||
-      '';
-    const legalBasis = matchedOption?.legalBasis || currentEvent.legalContext || 'CLT/CF/88';
-
-    socket.timeout(6000).emit(
-      'game:answer_question',
-      { roomId: onlineRoom.roomId, optionId, optionText, isCorrect, pointsEarned, penalty: 0, explanation, legalBasis },
-      (err: Error | null, res?: { ok: boolean; error?: string }) => {
-        if (err) resolve({ ok: false, error: 'Sem resposta do servidor. Confira a conexão e tente de novo.' });
-        else resolve(res ?? { ok: true });
+    new Promise<{ ok: boolean; error?: string }>((resolve) => {
+      if (!onlineRoom || !currentEvent?.question) {
+        resolve({ ok: false, error: 'Pergunta indisponível. Aguarde a atualização da sala.' });
+        return;
       }
-    );
-  });
+
+      const matchedOption = currentEvent.question.options.find(
+        (o) => o.id === optionId || o.text === optionId || o.text === optionText
+      );
+
+      const isCorrect = !!matchedOption?.isCorrect;
+      const pointsEarned = matchedOption ? currentEvent.question.pointsReward : 0;
+      const explanation = matchedOption?.explanation || currentEvent.question.options.find((o) => o.isCorrect)?.explanation || '';
+      const legalBasis = matchedOption?.legalBasis || currentEvent.legalContext || 'CLT/CF/88';
+
+      socket.timeout(6000).emit(
+        'game:answer_question',
+        {
+          roomId: onlineRoom.roomId,
+          optionId,
+          optionText,
+          isCorrect,
+          pointsEarned,
+          penalty: 0,
+          explanation,
+          legalBasis,
+        },
+        (err: Error | null, res?: { ok: boolean; error?: string }) => {
+          if (err) resolve({ ok: false, error: 'Sem resposta do servidor. Confira a conexão e tente de novo.' });
+          else resolve(res ?? { ok: true });
+        }
+      );
+    });
 
   const handleContinueOnline = () => {
     if (!onlineRoom) return;
