@@ -466,9 +466,14 @@ export default function App() {
   // Check turn ownership in online mode
   const isMyTurn = useMemo(() => {
     if (gameMode !== 'online') return true;
-    if (!myOnlinePlayer || !activePlayer) return false;
-    return activePlayer.id === myOnlinePlayer.id;
-  }, [gameMode, myOnlinePlayer, activePlayer]);
+    if (!onlineRoom) return false;
+    const currentActivePlayer = onlineRoom.players[onlineRoom.activePlayerIndex];
+    if (!currentActivePlayer) return false;
+    if (myOnlinePlayer && currentActivePlayer.id === myOnlinePlayer.id) return true;
+    if (currentActivePlayer.socketId === socket.id) return true;
+    if (activePlayer && myOnlinePlayer && activePlayer.id === myOnlinePlayer.id) return true;
+    return false;
+  }, [gameMode, onlineRoom, myOnlinePlayer, activePlayer, socket.id]);
 
   const isHost = useMemo(() => {
     if (gameMode !== 'online') return true;
