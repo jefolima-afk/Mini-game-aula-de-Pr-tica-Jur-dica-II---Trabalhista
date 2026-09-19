@@ -37,7 +37,7 @@ interface EventModalProps {
   isMyTurn?: boolean;
   isHost?: boolean;
   activeQuestionAnswer?: ActiveQuestionAnswer | null;
-  onSubmitOnlineAnswer?: (optionId: string, optionText: string) => void;
+  onSubmitOnlineAnswer?: (optionId: string, optionText: string) => Promise<{ ok: boolean; error?: string }>;
   onContinueOnline?: () => void;
 }
 
@@ -59,6 +59,7 @@ export const EventModal: React.FC<EventModalProps> = ({
   const [isAnswerSubmitted, setIsAnswerSubmitted] = useState<boolean>(false);
   const [isCorrectAnswer, setIsCorrectAnswer] = useState<boolean>(false);
   const [isPendingSubmit, setIsPendingSubmit] = useState<boolean>(false);
+  const [submitError, setSubmitError] = useState<string | null>(null);
 
   // Bonus choice state: 'points' (+15 pts) or 'steps' (+2 casas)
   const [bonusChoice, setBonusChoice] = useState<'points' | 'steps'>('points');
@@ -67,19 +68,22 @@ export const EventModal: React.FC<EventModalProps> = ({
   const [selectedChoice, setSelectedChoice] = useState<EventChoice | null>(null);
 
   useEffect(() => {
-  if (isOpen && event) {
-    setSelectedOptionId(null);
-    setIsAnswerSubmitted(false);
-    setIsCorrectAnswer(false);
-    setIsPendingSubmit(false);
-    setSubmitError(null);
-    setSelectedChoice(null);
-    setBonusChoice('points');
-    // ...sons como já estão
-  }
-}, [isOpen, event?.id]);
-  
-  const [submitError, setSubmitError] = useState<string | null>(null);
+    if (isOpen && event) {
+      setSelectedOptionId(null);
+      setIsAnswerSubmitted(false);
+      setIsCorrectAnswer(false);
+      setIsPendingSubmit(false);
+      setSubmitError(null);
+      setSelectedChoice(null);
+      setBonusChoice('points');
+
+      if (event.type === 'bonus') {
+        sound.playCashSound();
+      } else {
+        sound.playStepSound();
+      }
+    }
+  }, [isOpen, event?.id]);
 
   // Synchronize when activeQuestionAnswer is received from server
   useEffect(() => {
@@ -135,23 +139,24 @@ export const EventModal: React.FC<EventModalProps> = ({
 
   // Confirm Question Answer (Unified for Online and Offline)
   const handleConfirmAnswer = async () => {
-  if (!event.question || !selectedOptionId || isQuestionAnswered || isPendingSubmit) return;
-  const chosen = event.question.options.find((opt) => opt.id === selectedOptionId);
-  if (!chosen) return;
+    if (!event.question || !selectedOptionId || isQuestionAnswered || isPendingSubmit) return;
 
-  if (isOnline) {
-    if (!isMyTurn || !onSubmitOnlineAnswer) return;
-    setSubmitError(null);
-    setIsPendingSubmit(true);
-    const res = await onSubmitOnlineAnswer(chosen.id, chosen.text);
-    if (!res.ok) {
-      setIsPendingSubmit(false);
-      setSubmitError(res.error || 'Não foi possível enviar a resposta.');
+    const chosen = event.question.options.find((opt) => opt.id === selectedOptionId);
+    if (!chosen) return;
+
+    if (isOnline) {
+      if (!isMyTurn || !onSubmitOnlineAnswer) return;
+      setSubmitError(null);
+      setIsPendingSubmit(true);
+      const res = await onSubmitOnlineAnswer(chosen.id, chosen.text);
+      if (!res.ok) {
+        setIsPendingSubmit(false);
+        setSubmitError(res.error || 'Não foi possível enviar a resposta.');
+      }
+    } else {
+      handleSubmitAnswerOffline();
     }
-  } else {
-    handleSubmitAnswerOffline();
-  }
-};
+  };
 
   // Confirm and close after answering question
   const handleConfirmQuestionOutcome = () => {
@@ -511,12 +516,13 @@ export const EventModal: React.FC<EventModalProps> = ({
                     );
                   })}
                 </div>
-                
-{submitError && (
-  <div className="p-2.5 rounded-xl bg-rose-950/40 border border-rose-500/50 text-rose-200 text-xs">
-    {submitError}
-  </div>
-)}
+
+                {submitError && (
+                  <div className="p-2.5 rounded-xl bg-rose-950/40 border border-rose-500/50 text-rose-200 text-xs">
+                    {submitError}
+                  </div>
+                )}
+
                 {/* Feedback & Grounded Legal Basis after Answer */}
                 {isQuestionAnswered && (
                   <motion.div
