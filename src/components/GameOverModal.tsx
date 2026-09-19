@@ -105,10 +105,13 @@ export const GameOverModal: React.FC<GameOverModalProps> = ({
     );
 
     // 3. Quem respondeu menos perguntas (pode haver empate)
-    const minAnswered = Math.min(...players.map((p) => p.questionsAnsweredCount || 0), 0);
-    const fewestAnsweredWinners = players.filter(
-      (p) => (p.questionsAnsweredCount || 0) === minAnswered
-    );
+    const minAnswered = players.length > 0 
+    ? Math.min(...players.map((p) => p.questionsAnsweredCount || 0)) 
+    : 0;
+
+  const fewestAnsweredWinners = players.filter(
+  (p) => (p.questionsAnsweredCount || 0) === minAnswered
+);
 
     // Calculate final scores for each player
     const playersWithScores = players.map((player) => {
