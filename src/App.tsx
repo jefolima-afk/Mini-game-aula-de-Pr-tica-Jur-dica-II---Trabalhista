@@ -416,11 +416,10 @@ export default function App() {
         finishSuccess();
       };
 
-      const cleanup = () => {
-        socket.off('game:answer_ack', onAnswerAck);
-        socket.off('game:question_answered', onQuestionAnswered);
-        clearTimeout(fallbackTimer);
-      };
+     const cleanup = () => {
+  socket.off('game:answer_ack', onAnswerAck);
+  socket.off('game:question_answered', onQuestionAnswered);
+};
 
       socket.once('game:answer_ack', onAnswerAck);
       socket.once('game:question_answered', onQuestionAnswered);
