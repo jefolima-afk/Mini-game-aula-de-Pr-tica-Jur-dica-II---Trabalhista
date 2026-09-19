@@ -31,12 +31,12 @@ export const RulesModal: React.FC<RulesModalProps> = ({ isOpen, onClose }) => {
           <div className="p-3 rounded-xl bg-slate-800/60 border border-slate-700/60 flex items-start gap-3">
             <Compass className="w-5 h-5 text-emerald-400 flex-shrink-0 mt-0.5" />
             <div>
-              <h4 className="font-bold text-white mb-1">1. Tabuleiro de 35 Casas (1 a 35)</h4>
+              <h4 className="font-bold text-white mb-1">1. Tabuleiro de 35 Casas (00 a 34)</h4>
               <p className="text-slate-400 leading-relaxed">
                 • <strong>Casa 00:</strong> Ponto de Partida (0 pontos).<br />
-                • <strong>6 Casas Bônus:</strong> Casas 5, 10, 15, 20, 25 e 30.<br />
-                • <strong>27 Casas de Perguntas:</strong> Casas 2, 3, 4, 6, 7, 8, 9, 11, 12, 13, 14, 16, 17, 18, 19, 21, 22, 23, 24, 26, 27, 28, 29, 31, 32, 33 e 34.<br />
-                • <strong>Casa 35:</strong> Linha de Chegada com Superpergunta.
+                • <strong>6 Casas Bônus:</strong> Casas 04, 09, 14, 19, 24 e 29.<br />
+                • <strong>27 Casas de Perguntas:</strong> Casas 01, 02, 03, 05, 06, 07, 08, 10, 11, 12, 13, 15, 16, 17, 18, 20, 21, 22, 23, 25, 26, 27, 28, 30, 31, 32 e 33.<br />
+                • <strong>Casa 34:</strong> Linha de Chegada com Superpergunta.
               </p>
             </div>
           </div>
@@ -56,7 +56,7 @@ export const RulesModal: React.FC<RulesModalProps> = ({ isOpen, onClose }) => {
             <div>
               <h4 className="font-bold text-white mb-1">3. 6 Casas Bônus (Benefício Direto)</h4>
               <p className="text-slate-400 leading-relaxed">
-                Ao cair nas casas <strong>5, 10, 15, 20, 25 ou 30</strong>, o jogador escolhe seu benefício: <strong>+15 Pontos Imediatos</strong> na contagem geral ou <strong>Avançar 2 Casas na Trilha</strong>!
+                Ao cair nas casas <strong>04, 09, 14, 19, 24 ou 29</strong>, o jogador escolhe seu benefício: <strong>+15 Pontos Imediatos</strong> na contagem geral ou <strong>Avançar 2 Casas na Trilha</strong>!
               </p>
             </div>
           </div>
@@ -66,7 +66,7 @@ export const RulesModal: React.FC<RulesModalProps> = ({ isOpen, onClose }) => {
             <div>
               <h4 className="font-bold text-white mb-1">4. Linha de Chegada: 7 Superperguntas (100 Pts)</h4>
               <p className="text-slate-400 leading-relaxed">
-                Ao alcançar a <strong>Casa 35</strong>, o participante responde à <strong>Superpergunta de Chegada (100 Pontos)</strong>. O jogo contém 7 Superperguntas exclusivas, garantindo uma pergunta final inédita para até 7 jogadores!
+                Ao alcançar a <strong>Casa 34</strong>, o participante responde à <strong>Superpergunta de Chegada (100 Pontos)</strong>. O jogo contém 7 Superperguntas exclusivas, garantindo uma pergunta final inédita para até 7 jogadores!
               </p>
             </div>
           </div>

@@ -317,7 +317,7 @@ export const EventModal: React.FC<EventModalProps> = ({
             </div>
 
             <div className="flex items-center gap-1.5 px-3 py-1 rounded-full bg-slate-800/90 border border-slate-700 text-xs">
-              <span className="font-bold text-amber-400">Casa {tile.id === 1 ? '00' : tile.id}</span>
+              <span className="font-bold text-amber-400">Casa {tile.id.toString().padStart(2, '0')}</span>
               <span className="text-slate-500">•</span>
               <span className="text-slate-300 font-medium">{tile.stage}</span>
             </div>

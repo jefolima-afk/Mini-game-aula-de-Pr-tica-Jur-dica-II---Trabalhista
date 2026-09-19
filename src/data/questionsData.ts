@@ -490,36 +490,36 @@ const TEMPLATES: Record<string, QuestionTemplate> = {
   },
 };
 
-// Map each of the 27 question tiles (2-4, 6-9, 11-14, 16-19, 21-24, 26-29, 31-34) to 5 distinct templates (Cartas A, B, C, D, E)
+// Map each of the 27 question tiles (1-3, 5-8, 10-13, 15-18, 20-23, 25-28, 30-33) to 5 distinct templates (Cartas A, B, C, D, E)
 // Total 27 * 5 = 135 questions.
 const TILE_CARDS_MAP: Record<number, string[]> = {
-  2: ['peticao_requisitos', 'peticao_sumarissimo', 'peticao_emenda', 'peticao_aditamento', 'peticao_homeoffice'],
-  3: ['contestacao_pje', 'contestacao_incompetencia', 'contestacao_prescricao', 'contestacao_declaratoria', 'contestacao_compensacao'],
-  4: ['audiencia_testemunhas', 'audiencia_ausencia', 'audiencia_contradita', 'audiencia_protesto', 'audiencia_testemunha_acao'],
-  6: ['provas_onus', 'provas_britanicos', 'provas_pericia_sumarissimo', 'provas_juiz_laudo', 'provas_falsidade'],
-  7: ['recursos_ed', 'recursos_ro_prazo', 'recursos_ro_custas', 'recursos_ro_reducao', 'recursos_ro_isencao'],
-  8: ['rr_julgador', 'rr_prequestionamento', 'rr_transcendencia', 'rr_execucao', 'ap_cabimento'],
-  9: ['ap_delimitacao', 'ap_incontroversa', 'ap_garantia', 'ap_custas', 'peticao_requisitos'],
-  11: ['peticao_sumarissimo', 'peticao_emenda', 'peticao_aditamento', 'peticao_homeoffice', 'contestacao_pje'],
-  12: ['contestacao_incompetencia', 'contestacao_prescricao', 'contestacao_declaratoria', 'contestacao_compensacao', 'audiencia_testemunhas'],
-  13: ['audiencia_ausencia', 'audiencia_contradita', 'audiencia_protesto', 'audiencia_testemunha_acao', 'provas_onus'],
-  14: ['provas_britanicos', 'provas_pericia_sumarissimo', 'provas_juiz_laudo', 'provas_falsidade', 'recursos_ed'],
-  16: ['recursos_ro_prazo', 'recursos_ro_custas', 'recursos_ro_reducao', 'recursos_ro_isencao', 'rr_julgador'],
-  17: ['rr_prequestionamento', 'rr_transcendencia', 'rr_execucao', 'ap_cabimento', 'ap_delimitacao'],
-  18: ['ap_incontroversa', 'ap_garantia', 'ap_custas', 'peticao_requisitos', 'peticao_sumarissimo'],
-  19: ['peticao_emenda', 'peticao_aditamento', 'peticao_homeoffice', 'contestacao_pje', 'contestacao_incompetencia'],
-  21: ['contestacao_prescricao', 'contestacao_declaratoria', 'contestacao_compensacao', 'audiencia_testemunhas', 'audiencia_ausencia'],
-  22: ['audiencia_contradita', 'audiencia_protesto', 'audiencia_testemunha_acao', 'provas_onus', 'provas_britanicos'],
-  23: ['provas_pericia_sumarissimo', 'provas_juiz_laudo', 'provas_falsidade', 'recursos_ed', 'recursos_ro_prazo'],
-  24: ['recursos_ro_custas', 'recursos_ro_reducao', 'recursos_ro_isencao', 'rr_julgador', 'rr_prequestionamento'],
-  26: ['rr_transcendencia', 'rr_execucao', 'ap_cabimento', 'ap_delimitacao', 'ap_incontroversa'],
-  27: ['ap_garantia', 'ap_custas', 'peticao_requisitos', 'peticao_sumarissimo', 'peticao_emenda'],
-  28: ['peticao_aditamento', 'peticao_homeoffice', 'contestacao_pje', 'contestacao_incompetencia', 'contestacao_prescricao'],
-  29: ['contestacao_declaratoria', 'contestacao_compensacao', 'audiencia_testemunhas', 'audiencia_ausencia', 'audiencia_contradita'],
-  31: ['audiencia_protesto', 'audiencia_testemunha_acao', 'provas_onus', 'provas_britanicos', 'provas_pericia_sumarissimo'],
-  32: ['provas_juiz_laudo', 'provas_falsidade', 'recursos_ed', 'recursos_ro_prazo', 'recursos_ro_custas'],
-  33: ['recursos_ro_reducao', 'recursos_ro_isencao', 'rr_julgador', 'rr_prequestionamento', 'rr_transcendencia'],
-  34: ['rr_execucao', 'ap_cabimento', 'ap_delimitacao', 'ap_incontroversa', 'ap_garantia'],
+  1: ['peticao_requisitos', 'peticao_sumarissimo', 'peticao_emenda', 'peticao_aditamento', 'peticao_homeoffice'],
+  2: ['contestacao_pje', 'contestacao_incompetencia', 'contestacao_prescricao', 'contestacao_declaratoria', 'contestacao_compensacao'],
+  3: ['audiencia_testemunhas', 'audiencia_ausencia', 'audiencia_contradita', 'audiencia_protesto', 'audiencia_testemunha_acao'],
+  5: ['provas_onus', 'provas_britanicos', 'provas_pericia_sumarissimo', 'provas_juiz_laudo', 'provas_falsidade'],
+  6: ['recursos_ed', 'recursos_ro_prazo', 'recursos_ro_custas', 'recursos_ro_reducao', 'recursos_ro_isencao'],
+  7: ['rr_julgador', 'rr_prequestionamento', 'rr_transcendencia', 'rr_execucao', 'ap_cabimento'],
+  8: ['ap_delimitacao', 'ap_incontroversa', 'ap_garantia', 'ap_custas', 'peticao_requisitos'],
+  10: ['peticao_sumarissimo', 'peticao_emenda', 'peticao_aditamento', 'peticao_homeoffice', 'contestacao_pje'],
+  11: ['contestacao_incompetencia', 'contestacao_prescricao', 'contestacao_declaratoria', 'contestacao_compensacao', 'audiencia_testemunhas'],
+  12: ['audiencia_ausencia', 'audiencia_contradita', 'audiencia_protesto', 'audiencia_testemunha_acao', 'provas_onus'],
+  13: ['provas_britanicos', 'provas_pericia_sumarissimo', 'provas_juiz_laudo', 'provas_falsidade', 'recursos_ed'],
+  15: ['recursos_ro_prazo', 'recursos_ro_custas', 'recursos_ro_reducao', 'recursos_ro_isencao', 'rr_julgador'],
+  16: ['rr_prequestionamento', 'rr_transcendencia', 'rr_execucao', 'ap_cabimento', 'ap_delimitacao'],
+  17: ['ap_incontroversa', 'ap_garantia', 'ap_custas', 'peticao_requisitos', 'peticao_sumarissimo'],
+  18: ['peticao_emenda', 'peticao_aditamento', 'peticao_homeoffice', 'contestacao_pje', 'contestacao_incompetencia'],
+  20: ['contestacao_prescricao', 'contestacao_declaratoria', 'contestacao_compensacao', 'audiencia_testemunhas', 'audiencia_ausencia'],
+  21: ['audiencia_contradita', 'audiencia_protesto', 'audiencia_testemunha_acao', 'provas_onus', 'provas_britanicos'],
+  22: ['provas_pericia_sumarissimo', 'provas_juiz_laudo', 'provas_falsidade', 'recursos_ed', 'recursos_ro_prazo'],
+  23: ['recursos_ro_custas', 'recursos_ro_reducao', 'recursos_ro_isencao', 'rr_julgador', 'rr_prequestionamento'],
+  25: ['rr_transcendencia', 'rr_execucao', 'ap_cabimento', 'ap_delimitacao', 'ap_incontroversa'],
+  26: ['ap_garantia', 'ap_custas', 'peticao_requisitos', 'peticao_sumarissimo', 'peticao_emenda'],
+  27: ['peticao_aditamento', 'peticao_homeoffice', 'contestacao_pje', 'contestacao_incompetencia', 'contestacao_prescricao'],
+  28: ['contestacao_declaratoria', 'contestacao_compensacao', 'audiencia_testemunhas', 'audiencia_ausencia', 'audiencia_contradita'],
+  30: ['audiencia_protesto', 'audiencia_testemunha_acao', 'provas_onus', 'provas_britanicos', 'provas_pericia_sumarissimo'],
+  31: ['provas_juiz_laudo', 'provas_falsidade', 'recursos_ed', 'recursos_ro_prazo', 'recursos_ro_custas'],
+  32: ['recursos_ro_reducao', 'recursos_ro_isencao', 'rr_julgador', 'rr_prequestionamento', 'rr_transcendencia'],
+  33: ['rr_execucao', 'ap_cabimento', 'ap_delimitacao', 'ap_incontroversa', 'ap_garantia'],
 };
 
 // Generate the 135 regular questions (5 per question tile)
@@ -550,16 +550,16 @@ for (const tileIdStr of Object.keys(TILE_CARDS_MAP)) {
   });
 }
 
-// 12 Superperguntas de Chegada (Casa 35) - 100 Pontos cada (Perguntas #136 a #147 do PDF)
+// 12 Superperguntas de Chegada (Casa 34) - 100 Pontos cada (Perguntas #136 a #147 do PDF)
 export const FINISH_SUPER_QUESTIONS: ManualQuestion[] = [
   {
     questionNumber: 136,
-    tileId: 35,
+    tileId: 34,
     cardLetter: 'CHEGADA-1',
     level: 'Superpergunta',
     points: 100,
     topic: 'Desafio Final de Chegada',
-    statement: 'SUPERPERGUNTA 1 (CASA 35): Na fase de execução de título judicial, o executado interpôs Agravo de Petição impugnando parte dos cálculos da liquidação. Qual é o requisito legal indispensável exigido pelo art. 897, § 1º da CLT sem o qual o recurso não será conhecido?',
+    statement: 'SUPERPERGUNTA 1 (CASA 34): Na fase de execução de título judicial, o executado interpôs Agravo de Petição impugnando parte dos cálculos da liquidação. Qual é o requisito legal indispensável exigido pelo art. 897, § 1º da CLT sem o qual o recurso não será conhecido?',
     options: [
       { letter: 'A', text: 'O recolhimento antecipado das custas fixadas em 5% do valor da liquidação.' },
       { letter: 'B', text: 'A delimitação justificada das matérias e dos valores impugnados, permitindo a execução imediata da parte incontroversa.' },
@@ -571,12 +571,12 @@ export const FINISH_SUPER_QUESTIONS: ManualQuestion[] = [
   },
   {
     questionNumber: 137,
-    tileId: 35,
+    tileId: 34,
     cardLetter: 'CHEGADA-2',
     level: 'Superpergunta',
     points: 100,
     topic: 'Desafio Final de Chegada',
-    statement: 'SUPERPERGUNTA 2 (CASA 35): Em sede de Recurso de Revista interposto na FASE DE EXECUÇÃO, qual a restrição constitucional e jurisprudencial estrita imposta pelo art. 896, § 2º da CLT e Súmula 266 do TST para o seu conhecimento?',
+    statement: 'SUPERPERGUNTA 2 (CASA 34): Em sede de Recurso de Revista interposto na FASE DE EXECUÇÃO, qual a restrição constitucional e jurisprudencial estrita imposta pelo art. 896, § 2º da CLT e Súmula 266 do TST para o seu conhecimento?',
     options: [
       { letter: 'A', text: 'O recurso exige depósito recursal equivalente ao quádruplo do valor da penhora.' },
       { letter: 'B', text: 'O recurso só é admitido por divergência jurisprudencial entre TRTs quanto ao valor das custas.' },
@@ -588,12 +588,12 @@ export const FINISH_SUPER_QUESTIONS: ManualQuestion[] = [
   },
   {
     questionNumber: 138,
-    tileId: 35,
+    tileId: 34,
     cardLetter: 'CHEGADA-3',
     level: 'Superpergunta',
     points: 100,
     topic: 'Desafio Final de Chegada',
-    statement: 'SUPERPERGUNTA 3 (CASA 35): Determinada empresa em Recuperação Judicial interpôs Recurso Ordinário contra sentença trabalhista. Nos termos do art. 899, § 10 da CLT e da OJ 140 da SDI-1 do TST, qual a situação do seu PREPARO (custas e depósito recursal)?',
+    statement: 'SUPERPERGUNTA 3 (CASA 34): Determinada empresa em Recuperação Judicial interpôs Recurso Ordinário contra sentença trabalhista. Nos termos do art. 899, § 10 da CLT e da OJ 140 da SDI-1 do TST, qual a situação do seu PREPARO (custas e depósito recursal)?',
     options: [
       { letter: 'A', text: 'A empresa em recuperação judicial é isenta do depósito recursal, mas permanece obrigada ao recolhimento das custas processuais.' },
       { letter: 'B', text: 'A empresa em recuperação judicial é isenta de custas e do depósito recursal simultaneamente.' },
@@ -605,12 +605,12 @@ export const FINISH_SUPER_QUESTIONS: ManualQuestion[] = [
   },
   {
     questionNumber: 139,
-    tileId: 35,
+    tileId: 34,
     cardLetter: 'CHEGADA-4',
     level: 'Superpergunta',
     points: 100,
     topic: 'Desafio Final de Chegada',
-    statement: 'SUPERPERGUNTA 4 (CASA 35): O que consubstancia o pressuposto específico da TRANSCENDÊNCIA POLÍTICA no Recurso de Revista segundo o art. 896-A, § 1º, II da CLT?',
+    statement: 'SUPERPERGUNTA 4 (CASA 34): O que consubstancia o pressuposto específico da TRANSCENDÊNCIA POLÍTICA no Recurso de Revista segundo o art. 896-A, § 1º, II da CLT?',
     options: [
       { letter: 'A', text: 'A presença de autoridades políticas ocupando o polo passivo da ação.' },
       { letter: 'B', text: 'O valor da condenação exceder 10.000 salários-mínimos vigentes.' },
@@ -622,12 +622,12 @@ export const FINISH_SUPER_QUESTIONS: ManualQuestion[] = [
   },
   {
     questionNumber: 140,
-    tileId: 35,
+    tileId: 34,
     cardLetter: 'CHEGADA-5',
     level: 'Superpergunta',
     points: 100,
     topic: 'Desafio Final de Chegada',
-    statement: 'SUPERPERGUNTA 5 (CASA 35): Em relação ao reexame de fatos e provas em sede de Recurso de Revista perante o Tribunal Superior do Trabalho, qual a vedação imposta pela Súmula 126 do TST e qual a sua razão de ser?',
+    statement: 'SUPERPERGUNTA 5 (CASA 34): Em relação ao reexame de fatos e provas em sede de Recurso de Revista perante o Tribunal Superior do Trabalho, qual a vedação imposta pela Súmula 126 do TST e qual a sua razão de ser?',
     options: [
       { letter: 'A', text: 'É permitido o reexame desde que o recorrente pague taxa de reapreciação probatória ao TST.' },
       { letter: 'B', text: 'É obrigatório o reexame quando houver mais de duas testemunhas divergentes.' },
@@ -639,12 +639,12 @@ export const FINISH_SUPER_QUESTIONS: ManualQuestion[] = [
   },
   {
     questionNumber: 141,
-    tileId: 35,
+    tileId: 34,
     cardLetter: 'CHEGADA-6',
     level: 'Superpergunta',
     points: 100,
     topic: 'Desafio Final de Chegada',
-    statement: 'SUPERPERGUNTA 6 (CASA 35): Se o Reclamante ausentar-se injustificadamente à audiência inicial, a ação será arquivada. Segundo o art. 844, § 2º da CLT, o Reclamante beneficiário da gratuidade da justiça poderá ajuizar nova ação trabalhista sem pagar as custas do arquivamento anterior?',
+    statement: 'SUPERPERGUNTA 6 (CASA 34): Se o Reclamante ausentar-se injustificadamente à audiência inicial, a ação será arquivada. Segundo o art. 844, § 2º da CLT, o Reclamante beneficiário da gratuidade da justiça poderá ajuizar nova ação trabalhista sem pagar as custas do arquivamento anterior?',
     options: [
       { letter: 'A', text: 'Apenas se comprovar, no prazo de 15 dias do arquivamento, que a ausência ocorreu por motivo legalmente justificável; caso contrário, o pagamento das custas é condição para o novo ajuizamento.' },
       { letter: 'B', text: 'Sim, pode ajuizar nova ação imediatamente sem qualquer pagamento ou justificativa.' },
@@ -656,12 +656,12 @@ export const FINISH_SUPER_QUESTIONS: ManualQuestion[] = [
   },
   {
     questionNumber: 142,
-    tileId: 35,
+    tileId: 34,
     cardLetter: 'CHEGADA-7',
     level: 'Superpergunta',
     points: 100,
     topic: 'Desafio Final de Chegada',
-    statement: 'SUPERPERGUNTA 7 (CASA 35): Durante a instrução em audiência trabalhista no rito ordinário, o Juiz indeferiu a oitiva da principal testemunha do réu que comprovaria a ausência de horas extras. O advogado do réu registrou seus PROTESTOS em ata. Qual o fundamento jurídico do Recurso Ordinário em relação a esse ato?',
+    statement: 'SUPERPERGUNTA 7 (CASA 34): Durante a instrução em audiência trabalhista no rito ordinário, o Juiz indeferiu a oitiva da principal testemunha do réu que comprovaria a ausência de horas extras. O advogado do réu registrou seus PROTESTOS em ata. Qual o fundamento jurídico do Recurso Ordinário em relação a esse ato?',
     options: [
       { letter: 'A', text: 'Pedido de prisão do juiz da vara por excesso de exação.' },
       { letter: 'B', text: 'Arguição de prescrição intercorrente e perempção.' },
@@ -673,12 +673,12 @@ export const FINISH_SUPER_QUESTIONS: ManualQuestion[] = [
   },
   {
     questionNumber: 143,
-    tileId: 35,
+    tileId: 34,
     cardLetter: 'CHEGADA-8',
     level: 'Superpergunta',
     points: 100,
     topic: 'Desafio Final de Chegada',
-    statement: 'SUPERPERGUNTA 8 (CASA 35): Conforme a Súmula 443 do TST, presume-se DISCRIMINATÓRIA a despedida de empregado portador do vírus HIV ou de outra doença grave que suscite estigma ou preconceito. O direito reconhecido ao trabalhador é:',
+    statement: 'SUPERPERGUNTA 8 (CASA 34): Conforme a Súmula 443 do TST, presume-se DISCRIMINATÓRIA a despedida de empregado portador do vírus HIV ou de outra doença grave que suscite estigma ou preconceito. O direito reconhecido ao trabalhador é:',
     options: [
       { letter: 'A', text: 'Apenas indenização por danos morais fixada em 1 salário mínimo.' },
       { letter: 'B', text: 'Reintegração no emprego com pagamento integral dos salários do período de afastamento.' },
@@ -690,12 +690,12 @@ export const FINISH_SUPER_QUESTIONS: ManualQuestion[] = [
   },
   {
     questionNumber: 144,
-    tileId: 35,
+    tileId: 34,
     cardLetter: 'CHEGADA-9',
     level: 'Superpergunta',
     points: 100,
     topic: 'Desafio Final de Chegada',
-    statement: 'SUPERPERGUNTA 9 (CASA 35): No julgamento do Tema 725 da Repercussão Geral (ADPF 324), o Supremo Tribunal Federal fixou a tese de que:',
+    statement: 'SUPERPERGUNTA 9 (CASA 34): No julgamento do Tema 725 da Repercussão Geral (ADPF 324), o Supremo Tribunal Federal fixou a tese de que:',
     options: [
       { letter: 'A', text: 'É absolutamente proibida a terceirização na atividade-fim das empresas.' },
       { letter: 'B', text: 'É lícita a terceirização ou qualquer outra forma de divisão do trabalho entre pessoas jurídicas distintas, independentemente do objeto social das empresas envolvidas.' },
@@ -707,12 +707,12 @@ export const FINISH_SUPER_QUESTIONS: ManualQuestion[] = [
   },
   {
     questionNumber: 145,
-    tileId: 35,
+    tileId: 34,
     cardLetter: 'CHEGADA-10',
     level: 'Superpergunta',
     points: 100,
     topic: 'Desafio Final de Chegada',
-    statement: 'SUPERPERGUNTA 10 (CASA 35): A Súmula Vinculante 13 do STF proíbe a prática do NEPOTISMO no serviço público. Essa vedação alcança a nomeação de parentes até qual grau na linha reta, colateral ou por afinidade?',
+    statement: 'SUPERPERGUNTA 10 (CASA 34): A Súmula Vinculante 13 do STF proíbe a prática do NEPOTISMO no serviço público. Essa vedação alcança a nomeação de parentes até qual grau na linha reta, colateral ou por afinidade?',
     options: [
       { letter: 'A', text: 'Até o 1º grau apenas (pais e filhos).' },
       { letter: 'B', text: 'Até o 2º grau (irmãos e avós).' },
@@ -724,12 +724,12 @@ export const FINISH_SUPER_QUESTIONS: ManualQuestion[] = [
   },
   {
     questionNumber: 146,
-    tileId: 35,
+    tileId: 34,
     cardLetter: 'CHEGADA-11',
     level: 'Superpergunta',
     points: 100,
     topic: 'Desafio Final de Chegada',
-    statement: 'SUPERPERGUNTA 11 (CASA 35): Diante do princípio da continuidade da relação de emprego (Súmula 212 do TST), quando o empregador nega a despedida e alega abandono ou pedido de demissão, o ônus da prova pertence ao:',
+    statement: 'SUPERPERGUNTA 11 (CASA 34): Diante do princípio da continuidade da relação de emprego (Súmula 212 do TST), quando o empregador nega a despedida e alega abandono ou pedido de demissão, o ônus da prova pertence ao:',
     options: [
       { letter: 'A', text: 'Empregado, sob pena de extinção do feito.' },
       { letter: 'B', text: 'Empregador, pois o término do contrato constitui fato modificativo ou extintivo do direito pleiteado.' },
@@ -741,12 +741,12 @@ export const FINISH_SUPER_QUESTIONS: ManualQuestion[] = [
   },
   {
     questionNumber: 147,
-    tileId: 35,
+    tileId: 34,
     cardLetter: 'CHEGADA-12',
     level: 'Superpergunta',
     points: 100,
     topic: 'Desafio Final de Chegada',
-    statement: 'SUPERPERGUNTA 12 (CASA 35): Segundo o Tema 497 do STF (RE 629.053), a ESTABILIDADE PROVISÓRIA da gestante (art. 10, II, "b", do ADCT) exige como pressuposto objetivo tão somente:',
+    statement: 'SUPERPERGUNTA 12 (CASA 34): Segundo o Tema 497 do STF (RE 629.053), a ESTABILIDADE PROVISÓRIA da gestante (art. 10, II, "b", do ADCT) exige como pressuposto objetivo tão somente:',
     options: [
       { letter: 'A', text: 'A comunicação prévia e por escrito ao empregador antes da dispensa.' },
       { letter: 'B', text: 'A confirmação do estado de gravidez na vigência do contrato de trabalho, sendo irrelevante o conhecimento prévio pelo empregador.' },
@@ -763,7 +763,7 @@ export const ALL_QUESTIONS: ManualQuestion[] = [...REGULAR_QUESTIONS, ...FINISH_
 
 // Helper to get questions for a specific tile
 export function getQuestionsForTile(tileId: number): ManualQuestion[] {
-  if (tileId === 35) {
+  if (tileId === 34) {
     return FINISH_SUPER_QUESTIONS;
   }
   return REGULAR_QUESTIONS.filter((q) => q.tileId === tileId);

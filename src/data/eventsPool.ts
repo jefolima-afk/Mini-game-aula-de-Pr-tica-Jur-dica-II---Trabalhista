@@ -37,8 +37,8 @@ export function mapManualQuestionToEvent(q: ManualQuestion): LawGameEvent {
     questionNumber: q.questionNumber,
     cardLetter: q.cardLetter,
     level: q.level,
-    title: `Casa ${q.tileId} • ${q.cardLetter.startsWith('CHEGADA') ? 'Superpergunta Final' : `Carta ${q.cardLetter}`} (#${q.questionNumber})`,
-    category: q.tileId === 35 ? 'finish' : 'question',
+    title: `Casa ${q.tileId.toString().padStart(2, '0')} • ${q.cardLetter.startsWith('CHEGADA') ? 'Superpergunta Final' : `Carta ${q.cardLetter}`} (#${q.questionNumber})`,
+    category: q.tileId === 34 ? 'finish' : 'question',
     type: 'question',
     description: `Tópico: ${q.topic} • Nível: ${q.level} • Vale: ${q.points} Pontos`,
     legalContext: q.legalBasis,
@@ -110,8 +110,8 @@ export class QuestionTracker {
 
 // Get the event for any landed tile
 export function getEventForTile(tile: Tile): LawGameEvent {
-  // CASA 1: Ponto de partida
-  if (tile.id === 1) {
+  // CASA 00: Ponto de partida
+  if (tile.id === 0) {
     return {
       id: 'start_tile',
       title: 'Partida: Início da Carreira',
@@ -128,35 +128,35 @@ export function getEventForTile(tile: Tile): LawGameEvent {
     };
   }
 
-  // CASAS BÔNUS OFICIAIS: 5, 10, 15, 20, 25 e 30
-  if ([5, 10, 15, 20, 25, 30].includes(tile.id)) {
+  // CASAS BÔNUS OFICIAIS: 04, 09, 14, 19, 24 e 29 (6 Casas)
+  if ([4, 9, 14, 19, 24, 29].includes(tile.id)) {
     const bonusNames: Record<number, { title: string; desc: string; basis: string }> = {
-      5: {
+      4: {
         title: 'BÔNUS: Consultoria Preventiva',
         desc: 'Seu parecer eliminou riscos de passivo trabalhista prévio para a empresa cliente.',
         basis: 'Art. 133 da CF/88 e Código de Ética e Disciplina da OAB',
       },
-      10: {
+      9: {
         title: 'BÔNUS: Acordo Homologado',
         desc: 'Composição amigável em audiência de conciliação vantajosa e sem custas adicionais.',
         basis: 'Art. 846 e 764 da CLT: Conciliação como princípio basilar do processo do trabalho',
       },
-      15: {
+      14: {
         title: 'BÔNUS: Tutela de Urgência',
         desc: 'Ordem liminar deferida pelo juízo para reintegração imediata de empregado protegido.',
         basis: 'Art. 300 do CPC c/c Art. 769 da CLT',
       },
-      20: {
+      19: {
         title: 'BÔNUS: Sustentação Oral no TRT',
         desc: 'Reforma de decisão desfavorável em acórdão por unanimidade na Turma Regional.',
         basis: 'Regimento Interno dos TRTs e Prerrogativas da Advocacia (Lei 8.906/94)',
       },
-      25: {
+      24: {
         title: 'BÔNUS: Artigo Publicado no TST',
         desc: 'Estudo doutrinário inovador citado por Ministros do Tribunal Superior do Trabalho.',
         basis: 'Doutrina Trabalhista e Fonte Material do Direito do Trabalho',
       },
-      30: {
+      29: {
         title: 'BÔNUS: Notório Saber',
         desc: 'Atuação de destaque em dissídio coletivo de greve com mediação equilibrada.',
         basis: 'Art. 114, § 2º da CF/88',
@@ -188,13 +188,13 @@ export function getEventForTile(tile: Tile): LawGameEvent {
     };
   }
 
-  // CASA 35: LINHA DE CHEGADA (Superpergunta 100 pontos entre as 7 opções)
-  if (tile.id === 35) {
+  // CASA 34: LINHA DE CHEGADA (Superpergunta 100 pontos entre as 7 opções)
+  if (tile.id === 34) {
     const q = QuestionTracker.getNextFinishQuestion();
     return mapManualQuestionToEvent(q);
   }
 
-  // CASAS DE PERGUNTAS (27 Casas): 2, 3, 4, 6, 7, 8, 9, 11, 12, 13, 14, 16, 17, 18, 19, 21, 22, 23, 24, 26, 27, 28, 29, 31, 32, 33, 34
+  // CASAS DE PERGUNTAS (27 Casas): 1, 2, 3, 5, 6, 7, 8, 10, 11, 12, 13, 15, 16, 17, 18, 20, 21, 22, 23, 25, 26, 27, 28, 30, 31, 32, 33
   const questionObj = QuestionTracker.getNextQuestionForTile(tile.id);
   return mapManualQuestionToEvent(questionObj);
 }

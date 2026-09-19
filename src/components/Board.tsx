@@ -82,7 +82,7 @@ export const Board: React.FC<BoardProps> = ({
           <span className="text-slate-600">➔</span>
           <div className="flex items-center gap-1.5">
             <span className="w-2.5 h-2.5 rounded-full bg-amber-400 shadow-sm shadow-amber-500/50 animate-pulse" />
-            <span className="font-bold text-amber-300">Casa 35: Chegada (100 pts)</span>
+            <span className="font-bold text-amber-300">Casa 34: Chegada (100 pts)</span>
           </div>
         </div>
 
@@ -104,8 +104,8 @@ export const Board: React.FC<BoardProps> = ({
               {/* Row Tiles Grid (7 Columns) */}
               <div className="grid grid-cols-7 gap-1 sm:gap-1.5 h-full">
                 {rowTiles.map((tile) => {
-                  const isStart = tile.id === 1;
-                  const isFinish = tile.id === 35;
+                  const isStart = tile.id === 0;
+                  const isFinish = tile.id === 34;
                   const isBonus = !!tile.isBonus;
                   const isHighlighted = highlightTileId === tile.id;
                   
@@ -190,7 +190,7 @@ export const Board: React.FC<BoardProps> = ({
                               : 'bg-slate-700 text-slate-200'
                           }`}
                         >
-                          {isStart ? '00' : tile.id}
+                          {tile.id.toString().padStart(2, '0')}
                         </span>
 
                         <div className="flex items-center gap-1">

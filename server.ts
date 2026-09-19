@@ -102,7 +102,7 @@ export interface OnlineRoom {
 
 const rooms = new Map<string, OnlineRoom>();
 
-const FINISH_TILE_ID = 35;
+const FINISH_TILE_ID = 34;
 const MAX_ROULETTE_STEPS = 8; // a roleta tem 8 casas (1 a 8)
 
 // Tokens de reconexão: ficam SOMENTE no servidor (nunca dentro do objeto da sala,
@@ -202,7 +202,7 @@ io.on('connection', (socket: Socket) => {
         isHost: true,
         points: 0,
         reputation: 100,
-        position: 1,
+        position: 0,
         isFinished: false,
         questionsAnsweredCount: 0,
         correctAnswersCount: 0,
@@ -332,7 +332,7 @@ io.on('connection', (socket: Socket) => {
           isHost: false,
           points: 0,
           reputation: 100,
-          position: 1,
+          position: 0,
           isFinished: false,
           questionsAnsweredCount: 0,
           correctAnswersCount: 0,
@@ -448,7 +448,8 @@ io.on('connection', (socket: Socket) => {
     if (!Number.isInteger(stepsNumber) || stepsNumber < 1 || stepsNumber > MAX_ROULETTE_STEPS) return;
 
     // A posição de destino é calculada pelo servidor (não confiamos no valor enviado pelo cliente).
-    const targetPosition = Math.min((activePlayer.position || 1) + stepsNumber, FINISH_TILE_ID);
+    const currentPos = activePlayer.position ?? 0;
+    const targetPosition = Math.min(currentPos + stepsNumber, FINISH_TILE_ID);
 
     room.spinningNumber = stepsNumber;
     room.phase = 'spinning';
@@ -477,12 +478,13 @@ io.on('connection', (socket: Socket) => {
       room.spinningNumber = null;
       room.phase = 'playing';
 
+      const tileNumStr = targetPosition.toString().padStart(2, '0');
       room.logs.unshift({
         id: `log-${Date.now()}`,
         playerId: activePlayer.id,
         playerName: activePlayer.name,
         playerColor: activePlayer.color,
-        text: `Chegou à casa ${targetPosition} (${eventTile?.title || 'Trilha'})!`,
+        text: `Chegou à casa ${tileNumStr} (${eventTile?.title || 'Trilha'})!`,
         type: 'move',
         timestamp: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
       });
@@ -632,7 +634,7 @@ io.on('connection', (socket: Socket) => {
     if (points) activePlayer.points = (Number(activePlayer.points) || 0) + points;
     if (reputation) activePlayer.reputation = Math.min(100, (activePlayer.reputation || 100) + reputation);
     if (moveSteps) {
-      activePlayer.position = Math.min(35, (activePlayer.position || 1) + moveSteps);
+      activePlayer.position = Math.min(FINISH_TILE_ID, (activePlayer.position ?? 0) + moveSteps);
     }
 
     room.logs.unshift({
@@ -661,7 +663,7 @@ io.on('connection', (socket: Socket) => {
     if (!isActivePlayerSocket(room, socket.id) && socket.id !== room.hostSocketId) return;
 
     // O servidor decide se o jogador realmente chegou e qual é a colocação/bônus.
-    if (activePlayer.isFinished || (activePlayer.position || 1) < FINISH_TILE_ID) return;
+    if (activePlayer.isFinished || (activePlayer.position ?? 0) < FINISH_TILE_ID) return;
 
     const rank = room.players.filter((p) => p.isFinished).length + 1;
     const bonusPoints = 20;

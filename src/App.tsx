@@ -17,7 +17,7 @@ import { RulesModal } from './components/RulesModal';
 import { OnlineLobby } from './components/OnlineLobby';
 import { OnlineChatDrawer } from './components/OnlineChatDrawer';
 
-const FINISH_TILE_ID = 35;
+const FINISH_TILE_ID = 34;
 
 export default function App() {
   const socket = getSocket();
@@ -269,7 +269,7 @@ export default function App() {
 
     sound.playRouletteTick(0.5);
 
-    const startPos = activePlayer.position || 1;
+    const startPos = activePlayer.position ?? 0;
     const targetPos = Math.min(startPos + steps, FINISH_TILE_ID);
     const landedTile = BOARD_TILES.find((t) => t.id === targetPos) || BOARD_TILES[BOARD_TILES.length - 1];
     const event = getEventForTile(landedTile);
@@ -310,7 +310,7 @@ export default function App() {
           activePlayer.id,
           activePlayer.name,
           activePlayer.color,
-          `Passou pela casa ${currentStep} (${passingTile?.title || 'Trilha'}): ${mini.text}`,
+          `Passou pela casa ${currentStep.toString().padStart(2, '0')} (${passingTile?.title || 'Trilha'}): ${mini.text}`,
           'move'
         );
       }
@@ -439,7 +439,7 @@ export default function App() {
         });
       }
 
-      if ((activePlayer.position || 1) >= FINISH_TILE_ID && !activePlayer.isFinished) {
+      if ((activePlayer.position ?? 0) >= FINISH_TILE_ID && !activePlayer.isFinished) {
         const finishedCount = players.filter((p) => p.isFinished).length;
         socket.emit('game:player_finished', {
           roomId: onlineRoom.roomId,

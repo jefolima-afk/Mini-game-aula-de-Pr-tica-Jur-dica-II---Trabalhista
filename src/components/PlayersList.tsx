@@ -13,7 +13,7 @@ interface PlayersListProps {
 export const PlayersList: React.FC<PlayersListProps> = ({
   players,
   activePlayerId,
-  totalTiles = 35,
+  totalTiles = 34,
   myPlayerId,
 }) => {
   // Compute rankings based on points descending
@@ -35,7 +35,7 @@ export const PlayersList: React.FC<PlayersListProps> = ({
               Ranking dos Juristas
             </h3>
             <span className="text-[10px] text-slate-400 block mt-0.5">
-              {players.length} alunos • Trilha 1 a {totalTiles}
+              {players.length} alunos • Trilha 00 a {totalTiles.toString().padStart(2, '0')}
             </span>
           </div>
         </div>
@@ -56,7 +56,7 @@ export const PlayersList: React.FC<PlayersListProps> = ({
           const isActive = p.id === activePlayerId;
           const rank = getRank(p.id);
           const progressPercent = Math.min(
-            Math.max(Math.round(((p.position - 1) / (totalTiles - 1)) * 100), 0),
+            Math.max(Math.round(((p.position ?? 0) / (totalTiles || 34)) * 100), 0),
             100
           );
 
@@ -119,7 +119,7 @@ export const PlayersList: React.FC<PlayersListProps> = ({
                       )}
                     </div>
                     <span className="text-[9px] text-slate-400 truncate block leading-none">
-                      Casa {p.position === 1 ? '00' : p.position} • {p.correctAnswersCount} acertos ({p.questionsAnsweredCount || 0} perg.)
+                      Casa {(p.position ?? 0).toString().padStart(2, '0')} • {p.correctAnswersCount} acertos ({p.questionsAnsweredCount || 0} perg.)
                     </span>
                   </div>
                 </div>

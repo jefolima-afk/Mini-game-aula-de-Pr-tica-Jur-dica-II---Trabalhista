@@ -87,7 +87,7 @@ export const PlayerSetup: React.FC<PlayerSetupProps> = ({ onStartGame, onBackToL
       role: p.role,
       points: 0, // Inicia com 0 pontos conforme o manual oficial
       reputation: 50,
-      position: 1, // Casa 1: Ponto de Partida
+      position: 0, // Casa 00: Ponto de Partida
       isFinished: false,
       questionsAnsweredCount: 0,
       correctAnswersCount: 0,
