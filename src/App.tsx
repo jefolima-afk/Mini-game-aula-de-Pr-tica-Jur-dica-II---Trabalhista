@@ -282,6 +282,7 @@ export default function App() {
         targetPosition: targetPos,
         eventData: event,
         eventTile: landedTile,
+        playerToken: getPlayerToken(),
       });
       return;
     }
@@ -315,16 +316,25 @@ export default function App() {
       }
 
       setPlayers((prev) =>
-        prev.map((p) => (p.id === activePlayer.id ? { ...p, position: currentStep } : p))
+        prev.map((p) => (p.id === activePlayer.id ? { ...p, position: Math.min(currentStep, targetPos) } : p))
       );
-      setHighlightTileId(currentStep);
+      setHighlightTileId(Math.min(currentStep, targetPos));
 
       if (currentStep >= targetPos) {
         clearInterval(stepInterval);
-        setIsMoving(false);
-        setCurrentEventTile(landedTile);
-        setCurrentEvent(event);
-        setIsEventModalOpen(true);
+        setPlayers((prev) =>
+          prev.map((p) => (p.id === activePlayer.id ? { ...p, position: targetPos } : p))
+        );
+        setHighlightTileId(targetPos);
+        sound.playCashSound();
+
+        // Delay para o jogador ver a finalização da jogada na casa devida antes de abrir o card de pergunta
+        setTimeout(() => {
+          setIsMoving(false);
+          setCurrentEventTile(landedTile);
+          setCurrentEvent(event);
+          setIsEventModalOpen(true);
+        }, 900);
       }
     }, 280);
   };
@@ -348,7 +358,7 @@ export default function App() {
       const explanation = matchedOption?.explanation || currentEvent.question.options.find((o) => o.isCorrect)?.explanation || '';
       const legalBasis = matchedOption?.legalBasis || currentEvent.legalContext || 'CLT/CF/88';
 
-      socket.timeout(6000).emit(
+      socket.timeout(12000).emit(
         'game:answer_question',
         {
           roomId: onlineRoom.roomId,
@@ -359,6 +369,7 @@ export default function App() {
           penalty: 0,
           explanation,
           legalBasis,
+          playerToken: getPlayerToken(),
         },
         (err: Error | null, res?: { ok: boolean; error?: string }) => {
           if (err) resolve({ ok: false, error: 'Sem resposta do servidor. Confira a conexão e tente de novo.' });

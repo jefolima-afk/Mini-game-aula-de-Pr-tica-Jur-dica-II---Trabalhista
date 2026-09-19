@@ -112,6 +112,34 @@ export const Board: React.FC<BoardProps> = ({
                   // Players currently on this tile
                   const playersOnTile = players.filter((p) => p.position === tile.id);
                   const hasActivePlayer = playersOnTile.some((p) => p.id === activePlayerId);
+                  const playerCount = playersOnTile.length;
+
+                  // Dynamic background and styling according to student(s) on the tile
+                  let dynamicStyle: React.CSSProperties = {};
+                  if (playerCount > 1) {
+                    const slice = 360 / playerCount;
+                    const parts = playersOnTile.map((p, idx) => {
+                      const start = (idx * slice).toFixed(1);
+                      const end = ((idx + 1) * slice).toFixed(1);
+                      return `${p.color}d0 ${start}deg ${end}deg`;
+                    });
+                    dynamicStyle = {
+                      background: `conic-gradient(from -45deg at 50% 50%, ${parts.join(', ')})`,
+                      borderColor: hasActivePlayer ? '#fbbf24' : '#f1f5f9',
+                      boxShadow: hasActivePlayer
+                        ? '0 0 16px rgba(251, 191, 36, 0.55)'
+                        : '0 0 12px rgba(0, 0, 0, 0.65)',
+                    };
+                  } else if (playerCount === 1) {
+                    const c = playersOnTile[0].color;
+                    dynamicStyle = {
+                      background: `linear-gradient(135deg, ${c}70 0%, ${c}30 100%)`,
+                      borderColor: hasActivePlayer ? '#fbbf24' : c,
+                      boxShadow: hasActivePlayer
+                        ? `0 0 16px #fbbf24`
+                        : `0 0 12px ${c}60`,
+                    };
+                  }
 
                   // Strip any remaining "Casa X:" prefix so the number isn't repeated
                   const cleanTitle = tile.title.replace(/^Casa\s+\d+[:\s-–—]*\s*/i, '');
@@ -126,8 +154,13 @@ export const Board: React.FC<BoardProps> = ({
                       onClick={() => onTileClick?.(tile)}
                       whileHover={{ scale: 1.03 }}
                       transition={{ type: 'spring', stiffness: 450, damping: 25 }}
+                      style={dynamicStyle}
                       className={`relative flex flex-col justify-between p-1 sm:p-1.5 rounded-xl h-full min-h-[70px] sm:min-h-[78px] lg:min-h-0 cursor-pointer transition-all duration-150 border-2 select-none overflow-hidden ${
-                        isHighlighted
+                        playerCount > 0
+                          ? hasActivePlayer
+                            ? 'ring-2 ring-amber-300 z-10'
+                            : 'ring-1 ring-white/40 z-10'
+                          : isHighlighted
                           ? 'ring-2 ring-amber-400 border-amber-300 bg-amber-950/50 shadow-lg shadow-amber-500/30 z-10'
                           : hasActivePlayer
                           ? 'border-amber-400/90 bg-slate-800/95 shadow-md shadow-amber-500/20 ring-1 ring-amber-400/50 z-10'
@@ -140,8 +173,12 @@ export const Board: React.FC<BoardProps> = ({
                           : 'border-slate-800/90 hover:border-slate-700 bg-slate-800/40 hover:bg-slate-800/70'
                       }`}
                     >
+                      {/* Darkening readability scrim when players color the tile */}
+                      {playerCount > 0 && (
+                        <div className="absolute inset-0 bg-slate-950/40 backdrop-brightness-90 pointer-events-none" />
+                      )}
                       {/* Top Bar: Tile Number & Icon */}
-                      <div className="flex items-center justify-between gap-1 leading-none flex-shrink-0">
+                      <div className="relative z-10 flex items-center justify-between gap-1 leading-none flex-shrink-0">
                         <span
                           className={`w-4 h-4 sm:w-5 sm:h-5 rounded-full flex items-center justify-center font-display font-black text-[9px] sm:text-[11px] shadow-inner flex-shrink-0 ${
                             isStart
@@ -158,13 +195,12 @@ export const Board: React.FC<BoardProps> = ({
 
                         <div className="flex items-center gap-1">
                           {isBonus && (
-                            <span className="text-[10px] text-amber-300 font-black" title="Casa Bônus (+15 pts ou +2 casas)">
+                            <span className="text-[10px] text-amber-300 font-black drop-shadow" title="Casa Bônus (+15 pts ou +2 casas)">
                               ⭐
                             </span>
                           )}
                           <div
-                            className="p-0.5 rounded-md hidden sm:flex items-center justify-center"
-                            style={{ backgroundColor: `${tile.color}25` }}
+                            className="p-0.5 rounded-md hidden sm:flex items-center justify-center bg-slate-950/40"
                           >
                             <DynamicIcon name={tile.icon} className="w-3 h-3" color={tile.color} />
                           </div>
@@ -172,15 +208,15 @@ export const Board: React.FC<BoardProps> = ({
                       </div>
 
                       {/* Middle: Title - displayed in full without truncation */}
-                      <div className="flex-1 min-h-0 flex items-center justify-center my-0.5 px-0.5 text-center">
-                        <h4 className="text-[9px] sm:text-[9.5px] md:text-[10px] lg:text-[10.5px] font-bold text-white leading-[1.18] font-display tracking-tight break-words hyphens-auto">
+                      <div className="relative z-10 flex-1 min-h-0 flex items-center justify-center my-0.5 px-0.5 text-center">
+                        <h4 className="text-[9px] sm:text-[9.5px] md:text-[10px] lg:text-[10.5px] font-bold text-white leading-[1.18] font-display tracking-tight break-words hyphens-auto drop-shadow-[0_1px_3px_rgba(0,0,0,0.95)]">
                           {cleanTitle}
                         </h4>
                       </div>
 
                       {/* Bottom Row: Stage & Player Pawns */}
-                      <div className="flex items-center justify-between pt-0.5 border-t border-slate-700/30 min-h-[18px] leading-none flex-shrink-0">
-                        <span className="text-[8px] sm:text-[9px] text-slate-400 font-semibold uppercase truncate max-w-[48px] sm:max-w-[65px]">
+                      <div className="relative z-10 flex items-center justify-between pt-0.5 border-t border-slate-700/40 min-h-[18px] leading-none flex-shrink-0">
+                        <span className="text-[8px] sm:text-[9px] text-slate-300 font-semibold uppercase truncate max-w-[48px] sm:max-w-[65px] drop-shadow-[0_1px_2px_rgba(0,0,0,0.9)]">
                           {isStart ? 'Início' : isFinish ? 'Meta' : tile.stage}
                         </span>
 

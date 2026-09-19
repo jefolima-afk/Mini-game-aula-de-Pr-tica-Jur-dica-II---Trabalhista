@@ -55,9 +55,7 @@ export const GameOverModal: React.FC<GameOverModalProps> = ({
   const [areFinalistsRevealed, setAreFinalistsRevealed] = useState<boolean>(false);
   const [isSuspenseLoading, setIsSuspenseLoading] = useState<boolean>(false);
   const [hasTriggeredChampionEffects, setHasTriggeredChampionEffects] = useState<boolean>(false);
-  const [isPlayingSenna, setIsPlayingSenna] = useState<boolean>(false);
-  const [customAudioName, setCustomAudioName] = useState<string | null>(null);
-  const fileInputRef = useRef<HTMLInputElement>(null);
+  const [isPlayingVictory, setIsPlayingVictory] = useState<boolean>(false);
 
   // Synchronize external online ceremony updates from host
   useEffect(() => {
@@ -102,14 +100,18 @@ export const GameOverModal: React.FC<GameOverModalProps> = ({
       (p) => (p.correctAnswersCount || 0) === maxCorrect
     );
 
-    // 3. Quem respondeu menos perguntas (pode haver empate) - Ajustado com segurança
-    const minAnswered = players.length > 0 
-      ? Math.min(...players.map((p) => p.questionsAnsweredCount || 0)) 
+    // 3. Quem respondeu menos perguntas (dentre todos que responderam ao menos uma questão)
+    const playersWhoAnswered = players.filter((p) => (p.questionsAnsweredCount || 0) > 0);
+    const hasAnyAnswered = playersWhoAnswered.length > 0;
+    const minAnswered = hasAnyAnswered
+      ? Math.min(...playersWhoAnswered.map((p) => p.questionsAnsweredCount || 0))
       : 0;
 
-    const fewestAnsweredWinners = players.filter(
-      (p) => (p.questionsAnsweredCount || 0) === minAnswered
-    );
+    const fewestAnsweredWinners = hasAnyAnswered
+      ? playersWhoAnswered.filter(
+          (p) => (p.questionsAnsweredCount || 0) === minAnswered
+        )
+      : [];
 
     // Calculate final scores for each player
     const playersWithScores = players.map((player) => {
@@ -186,21 +188,21 @@ export const GameOverModal: React.FC<GameOverModalProps> = ({
       setAreFinalistsRevealed(false);
       setIsSuspenseLoading(false);
       setHasTriggeredChampionEffects(false);
-      setIsPlayingSenna(false);
+      setIsPlayingVictory(false);
       sound.playAwardTrumpet();
     } else {
-      sound.stopSennaVictoryTheme();
-      setIsPlayingSenna(false);
+      sound.stopVictorySound();
+      setIsPlayingVictory(false);
     }
     return () => {
-      sound.stopSennaVictoryTheme();
+      sound.stopVictorySound();
     };
   }, [isOpen]);
 
   const triggerChampionCelebration = () => {
-    setIsPlayingSenna(true);
-    sound.playSennaVictoryTheme(() => {
-      setIsPlayingSenna(false);
+    setIsPlayingVictory(true);
+    sound.playVictoryFanfare(() => {
+      setIsPlayingVictory(false);
     });
 
     try {
@@ -231,37 +233,14 @@ export const GameOverModal: React.FC<GameOverModalProps> = ({
     } catch {}
   };
 
-  const handleToggleSennaMusic = () => {
-    if (isPlayingSenna) {
-      sound.stopSennaVictoryTheme();
-      setIsPlayingSenna(false);
+  const handleToggleVictoryMusic = () => {
+    if (isPlayingVictory) {
+      sound.stopVictorySound();
+      setIsPlayingVictory(false);
     } else {
-      setIsPlayingSenna(true);
-      sound.playSennaVictoryTheme(() => {
-        setIsPlayingSenna(false);
-      });
-    }
-  };
-
-  const handleAudioFileUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
-    const file = e.target.files?.[0];
-    if (file) {
-      const url = URL.createObjectURL(file);
-      sound.setCustomVictoryAudio(url);
-      setCustomAudioName(file.name);
-      setIsPlayingSenna(true);
-      sound.playSennaVictoryTheme(() => {
-        setIsPlayingSenna(false);
-      });
-    }
-  };
-
-  const handleResetDefaultAudio = () => {
-    sound.setCustomVictoryAudio(null);
-    setCustomAudioName(null);
-    if (isPlayingSenna) {
-      sound.playSennaVictoryTheme(() => {
-        setIsPlayingSenna(false);
+      setIsPlayingVictory(true);
+      sound.playVictoryFanfare(() => {
+        setIsPlayingVictory(false);
       });
     }
   };
@@ -322,14 +301,6 @@ export const GameOverModal: React.FC<GameOverModalProps> = ({
         className="w-full max-w-5xl bg-slate-900 border-2 border-amber-500/40 rounded-2xl sm:rounded-3xl shadow-2xl overflow-hidden my-auto p-3 sm:p-4.5 relative flex flex-col justify-between max-h-[96vh]"
       >
         <div className="absolute top-0 left-1/2 -translate-x-1/2 w-4/5 h-24 bg-gradient-to-b from-amber-500/15 via-yellow-500/5 to-transparent blur-2xl pointer-events-none" />
-
-        <input 
-          type="file" 
-          ref={fileInputRef} 
-          onChange={handleAudioFileUpload} 
-          accept="audio/*" 
-          className="hidden" 
-        />
 
         <div className="text-center space-y-1.5 mb-2.5 flex-shrink-0 relative z-10">
           <div className="flex items-center justify-between gap-2 px-1">
@@ -609,7 +580,7 @@ export const GameOverModal: React.FC<GameOverModalProps> = ({
                       Quem Respondeu Menos Perguntas
                     </h3>
                     <p className="text-xs text-slate-300 mt-0.5 max-w-md mx-auto">
-                      Bonificação especial da sorte e agilidade na trilha de casas.
+                      Bonificação especial concedida a quem menos precisou responder perguntas (dentre todos os que responderam ao menos uma questão).
                     </p>
                   </div>
 
@@ -620,10 +591,12 @@ export const GameOverModal: React.FC<GameOverModalProps> = ({
                   <div className="pt-2 border-t border-slate-700/60 mt-2 space-y-1.5">
                     <div className="flex items-center justify-center gap-1 text-xs text-cyan-300 font-bold">
                       <Sparkles className="w-3 h-3" />
-                      {evaluation.fewestAnsweredWinners.length > 1 ? (
-                        <span>Empate! ({evaluation.fewestAnsweredWinners.length} juristas com apenas {evaluation.minAnswered} perguntas)</span>
+                      {evaluation.fewestAnsweredWinners.length === 0 ? (
+                        <span>Nenhum jogador respondeu perguntas nesta partida</span>
+                      ) : evaluation.fewestAnsweredWinners.length > 1 ? (
+                        <span>Empate! ({evaluation.fewestAnsweredWinners.length} juristas com {evaluation.minAnswered} pergunta{evaluation.minAnswered > 1 ? 's' : ''})</span>
                       ) : (
-                        <span>Jurista Contemplado(a) (apenas {evaluation.minAnswered} perguntas)</span>
+                        <span>Jurista Contemplado(a) ({evaluation.minAnswered} pergunta{evaluation.minAnswered > 1 ? 's' : ''} respondida{evaluation.minAnswered > 1 ? 's' : ''})</span>
                       )}
                     </div>
 
@@ -752,17 +725,17 @@ export const GameOverModal: React.FC<GameOverModalProps> = ({
 
                         <button
                           type="button"
-                          id="btn-toggle-senna-theme-header"
-                          onClick={handleToggleSennaMusic}
+                          id="btn-toggle-victory-theme-header"
+                          onClick={handleToggleVictoryMusic}
                           className={`inline-flex items-center gap-1 px-2.5 py-1 rounded-lg text-[10px] font-bold transition-all shadow cursor-pointer ${
-                            isPlayingSenna
+                            isPlayingVictory
                               ? 'bg-amber-400 text-slate-950 ring-1 ring-amber-300 animate-pulse'
                               : 'bg-slate-800 text-amber-300 hover:bg-slate-700 border border-amber-400/40'
                           }`}
-                          title="Tocar ou Pausar o Tema da Vitória"
+                          title="Tocar ou Pausar o Som de Vitória"
                         >
                           <Music className="w-3 h-3" />
-                          <span>{isPlayingSenna ? 'Tema Tocando 🏁' : 'Tocar Tema 🏁'}</span>
+                          <span>{isPlayingVictory ? 'Fanfarra Tocando 🏆' : 'Tocar Fanfarra 🏆'}</span>
                         </button>
                       </div>
                     )}
@@ -850,38 +823,16 @@ export const GameOverModal: React.FC<GameOverModalProps> = ({
                       <div className="mt-2 pt-1.5 border-t border-amber-500/20 flex items-center justify-between gap-2 flex-wrap text-[10px]">
                         <button
                           type="button"
-                          onClick={handleToggleSennaMusic}
+                          onClick={handleToggleVictoryMusic}
                           className={`inline-flex items-center gap-1 px-2.5 py-1 rounded-lg font-bold transition-all shadow cursor-pointer ${
-                            isPlayingSenna
+                            isPlayingVictory
                               ? 'bg-amber-400 text-slate-950 ring-2 ring-amber-300 animate-pulse'
                               : 'bg-slate-800 text-amber-300 hover:bg-slate-700 border border-amber-400/40'
                           }`}
                         >
                           <Music className="w-3 h-3 text-amber-400" />
-                          <span>{isPlayingSenna ? 'Tema da Vitória Tocando 🏁' : 'Tocar Tema da Vitória 🏁'}</span>
+                          <span>{isPlayingVictory ? 'Fanfarra Tocando 🏆' : 'Tocar Fanfarra de Vitória 🏆'}</span>
                         </button>
-
-                        <div className="flex items-center gap-1">
-                          <button
-                            type="button"
-                            onClick={() => fileInputRef.current?.click()}
-                            className="text-[9px] text-slate-400 hover:text-amber-300 underline inline-flex items-center gap-0.5 cursor-pointer"
-                          >
-                            <Upload className="w-2.5 h-2.5" />
-                            <span>{customAudioName ? 'Trocar MP3' : 'Usar outro áudio'}</span>
-                          </button>
-
-                          {customAudioName && (
-                            <button
-                              type="button"
-                              onClick={handleResetDefaultAudio}
-                              className="text-[9px] text-slate-400 hover:text-rose-300 underline inline-flex items-center gap-0.5 cursor-pointer ml-1"
-                            >
-                              <RefreshCw className="w-2.5 h-2.5" />
-                              <span>Restaurar</span>
-                            </button>
-                          )}
-                        </div>
                       </div>
                     </div>
 
@@ -1151,7 +1102,7 @@ export const GameOverModal: React.FC<GameOverModalProps> = ({
               type="button"
               id="btn-restart-from-gameover"
               onClick={() => {
-                sound.stopSennaVictoryTheme();
+                sound.stopVictorySound();
                 onRestartGame();
               }}
               className="px-4 py-2 rounded-xl font-bold text-xs sm:text-sm bg-gradient-to-r from-amber-500 to-amber-600 hover:from-amber-400 hover:to-amber-500 text-slate-950 shadow-md shadow-amber-500/20 active:scale-95 transition-all flex items-center gap-1.5 cursor-pointer font-display"

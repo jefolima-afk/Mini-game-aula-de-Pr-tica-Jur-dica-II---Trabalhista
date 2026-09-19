@@ -111,9 +111,20 @@ const MAX_ROULETTE_STEPS = 8; // a roleta tem 8 casas (1 a 8)
 const reconnectTokens = new Map<string, string>();
 
 // Somente o socket do jogador da vez pode jogar a rodada dele.
-function isActivePlayerSocket(room: OnlineRoom, socketId: string): boolean {
+// Permite validação por playerToken caso o socket tenha sofrido reconexão transitória.
+function isActivePlayerSocket(room: OnlineRoom, socketId: string, playerToken?: string): boolean {
   const active = room.players[room.activePlayerIndex];
-  return !!active && active.socketId === socketId;
+  if (!active) return false;
+  if (active.socketId === socketId) return true;
+  if (playerToken) {
+    const tokenKey = `${room.roomId}:${playerToken}`;
+    const tokenPlayerId = reconnectTokens.get(tokenKey);
+    if (tokenPlayerId && tokenPlayerId === active.id) {
+      active.socketId = socketId;
+      return true;
+    }
+  }
+  return false;
 }
 
 function isSocketConnected(socketId: string): boolean {
@@ -388,16 +399,18 @@ io.on('connection', (socket: Socket) => {
   });
 
   // 4. Roulette Spin Action
-  socket.on('game:spin_roulette', ({ roomId, steps, eventData, eventTile }) => {
-    if (roomId !== currentRoomId) return;
+  socket.on('game:spin_roulette', ({ roomId, steps, eventData, eventTile, playerToken }) => {
     const room = rooms.get(roomId);
     if (!room || room.phase !== 'playing') return;
 
-    // Somente o jogador da vez pode girar a roleta.
-    if (!isActivePlayerSocket(room, socket.id)) {
+    // Somente o jogador da vez pode girar a roleta (validado por socket ou token de reconexão).
+    if (!isActivePlayerSocket(room, socket.id, playerToken)) {
       console.warn(`[Multiplayer Security] Ignored game:spin_roulette from non-active socket ${socket.id}`);
       return;
     }
+
+    currentRoomId = roomId;
+    socket.join(roomId);
 
     const activePlayer = room.players[room.activePlayerIndex];
 
@@ -410,7 +423,7 @@ io.on('connection', (socket: Socket) => {
     room.spinningNumber = stepsNumber;
     room.phase = 'spinning';
 
-    // Broadcast spin animation immediately
+    // Broadcast spin animation immediately to all room players
     io.to(roomId).emit('game:roulette_spun', {
       steps: stepsNumber,
       playerId: activePlayer.id,
@@ -427,29 +440,50 @@ io.on('connection', (socket: Socket) => {
       timestamp: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
     });
 
-    // Update player position and prepare event
+    // Animação e Delay de Chegada:
+    // Passo 1: Ao término do giro da roleta (2800ms), atualiza o peão para a casa devida e publica a chegada
     setTimeout(() => {
       activePlayer.position = targetPosition;
-      room.phase = 'event';
-      room.currentEvent = eventData;
-      room.currentEventTile = eventTile;
-      room.isEventModalOpen = true;
-      room.activeQuestionAnswer = null;
+      room.spinningNumber = null;
+      room.phase = 'playing';
 
+      room.logs.unshift({
+        id: `log-${Date.now()}`,
+        playerId: activePlayer.id,
+        playerName: activePlayer.name,
+        playerColor: activePlayer.color,
+        text: `Chegou à casa ${targetPosition} (${eventTile?.title || 'Trilha'})!`,
+        type: 'move',
+        timestamp: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
+      });
+
+      // Emite chegada para todos os jogadores visualizarem o peão na casa de destino
       io.to(roomId).emit('room:updated', room);
-    }, 1800);
+
+      // Passo 2: Deixa a jogada terminar na casa devida e aguarda um delay nítido antes de abrir o card de pergunta
+      setTimeout(() => {
+        room.phase = 'event';
+        room.currentEvent = eventData;
+        room.currentEventTile = eventTile;
+        room.isEventModalOpen = true;
+        room.activeQuestionAnswer = null;
+
+        io.to(roomId).emit('room:updated', room);
+      }, 1200);
+    }, 2800);
   });
 
   // 5. Submit Question Answer (Strict Multiplayer Validation)
-  socket.on('game:answer_question', ({ roomId, optionId, optionText, isCorrect, pointsEarned, penalty, explanation, legalBasis }, callback) => {
+  socket.on('game:answer_question', ({ roomId, optionId, optionText, isCorrect, pointsEarned, penalty, explanation, legalBasis, playerToken }, callback) => {
     // Sempre responde ao cliente (ack) para que a interface nunca fique travada em "Enviando...".
     const reply = (res: { ok: boolean; error?: string }) => {
-      if (typeof callback === 'function') callback(res);
+      try {
+        if (typeof callback === 'function') callback(res);
+      } catch (err) {
+        console.error('Error in answer reply callback:', err);
+      }
     };
 
-    if (roomId !== currentRoomId) {
-      return reply({ ok: false, error: 'Sua conexão não está vinculada a esta sala. Recarregue a página.' });
-    }
     const room = rooms.get(roomId);
     if (!room || !room.isEventModalOpen) {
       return reply({ ok: false, error: 'Não há pergunta aberta no momento.' });
@@ -460,11 +494,14 @@ io.on('connection', (socket: Socket) => {
 
     // MULTIPLAYER SECURITY VALIDATION:
     // Only the active player corresponding to activePlayerIndex can answer.
-    // If sent by any other socket, reject immediately and do not alter match state.
-    if (!isActivePlayerSocket(room, socket.id)) {
+    // Aceita também validação por playerToken se o socket sofreu reconexão.
+    if (!isActivePlayerSocket(room, socket.id, playerToken)) {
       console.warn(`[Multiplayer Security] Ignored game:answer_question from unauthorized socket ${socket.id} (active player is ${activePlayer.name} [${activePlayer.id}])`);
       return reply({ ok: false, error: 'Não é a sua vez de responder.' });
     }
+
+    currentRoomId = roomId;
+    socket.join(roomId);
 
     // Prevent duplicate answers if already answered
     if (room.activeQuestionAnswer) {
