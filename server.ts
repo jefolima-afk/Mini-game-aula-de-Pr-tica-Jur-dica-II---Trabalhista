@@ -5,7 +5,7 @@ import { Server as SocketIOServer, Socket } from 'socket.io';
 import { createServer as createViteServer } from 'vite';
 
 // Port 3000 is hardcoded by the AI Studio container infrastructure
-const PORT = 3000;
+const PORT = Number(process.env.PORT) || 3000;
 // Origem permitida (ex.: https://seu-jogo.vercel.app). Sem a variável, libera qualquer origem.
 const CORS_ORIGIN = process.env.CORS_ORIGIN || '*';
 const app = express();
