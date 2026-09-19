@@ -1,9 +1,9 @@
-import React, { useState, useEffect, useCallback, useMemo } from 'react';
+import React, { useState, useEffect, useCallback, useMemo, useRef } from 'react';
 import { BOARD_TILES } from './data/boardTiles';
 import { getEventForTile, getRandomMiniStepEvent, QuestionTracker } from './data/eventsPool';
 import { Player, LawGameEvent, GamePhase, GameLogEntry, Tile, OnlineRoom, OnlinePlayer } from './types';
 import { sound } from './utils/audio';
-import { getSocket } from './utils/socket';
+import { getSocket, getPlayerToken } from './utils/socket';
 
 import { GameHeader } from './components/GameHeader';
 import { PlayerSetup } from './components/PlayerSetup';
@@ -28,6 +28,9 @@ export default function App() {
   // Online Multiplayer State
   const [onlineRoom, setOnlineRoom] = useState<OnlineRoom | null>(null);
   const [myOnlinePlayer, setMyOnlinePlayer] = useState<OnlinePlayer | null>(null);
+  // Referência sempre atualizada (os listeners do socket são registrados uma única vez)
+  const myOnlinePlayerRef = useRef<OnlinePlayer | null>(null);
+  const onlineRoomRef = useRef<OnlineRoom | null>(null);
   const [externalSpinNumber, setExternalSpinNumber] = useState<number | null>(null);
 
   // Local / Synchronized Game State
@@ -120,6 +123,8 @@ export default function App() {
     };
 
     const onRouletteSpun = ({ steps, playerId, playerName }: { steps: number; playerId: string; playerName: string }) => {
+      // Quem girou já viu a própria animação; só os demais jogadores assistem.
+      if (playerId === myOnlinePlayerRef.current?.id) return;
       setExternalSpinNumber(steps);
       // Reset external spin number after animation completes
       setTimeout(() => setExternalSpinNumber(null), 4000);
@@ -143,6 +148,46 @@ export default function App() {
       socket.off('room:updated', onRoomUpdated);
       socket.off('game:roulette_spun', onRouletteSpun);
       socket.off('chat:received', onChatReceived);
+    };
+  }, [socket]);
+
+  useEffect(() => {
+    myOnlinePlayerRef.current = myOnlinePlayer;
+  }, [myOnlinePlayer]);
+
+  useEffect(() => {
+    onlineRoomRef.current = onlineRoom;
+  }, [onlineRoom]);
+
+  // Se a conexão cair (ex.: celular bloqueou a tela) o socket reconecta com outro id.
+  // Reentra automaticamente na sala para o jogador continuar sendo ele mesmo.
+  useEffect(() => {
+    const onConnect = () => {
+      const room = onlineRoomRef.current;
+      const me = myOnlinePlayerRef.current;
+      if (!room || !me) return;
+
+      socket.emit(
+        'room:join',
+        {
+          roomId: room.roomId,
+          playerName: me.name,
+          avatar: me.avatar,
+          color: me.color,
+          role: me.role,
+          playerToken: getPlayerToken(),
+        },
+        (res: { ok: boolean; player?: OnlinePlayer; room?: OnlineRoom }) => {
+          if (res?.ok && res.player) {
+            setMyOnlinePlayer(res.player);
+          }
+        }
+      );
+    };
+
+    socket.on('connect', onConnect);
+    return () => {
+      socket.off('connect', onConnect);
     };
   }, [socket]);
 
@@ -219,6 +264,8 @@ export default function App() {
   // ===========================================================================
   const handleRouletteResult = (steps: number) => {
     if (!activePlayer || isMoving) return;
+    // Online: só o jogador da vez registra o resultado da roleta.
+    if (gameMode === 'online' && !isMyTurn) return;
 
     sound.playRouletteTick(0.5);
 
