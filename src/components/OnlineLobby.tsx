@@ -100,7 +100,7 @@ export const OnlineLobby: React.FC<OnlineLobbyProps> = ({
 
       // If room phase changed to playing, transition to game!
       if (room.phase === 'playing' || room.phase === 'spinning' || room.phase === 'moving' || room.phase === 'event') {
-        const foundMe = room.players.find((p) => p.socketId === socket.id);
+        const foundMe = room.players.find((p) => p.socketId === socket.id || (myPlayer && p.id === myPlayer.id));
         if (foundMe) {
           setMyPlayer(foundMe);
           onEnterOnlineGame(room, foundMe);

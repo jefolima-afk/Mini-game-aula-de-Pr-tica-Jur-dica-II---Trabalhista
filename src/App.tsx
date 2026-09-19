@@ -76,6 +76,7 @@ export default function App() {
   // ===========================================================================
   useEffect(() => {
     const onRoomUpdated = (updatedRoom: OnlineRoom) => {
+      onlineRoomRef.current = updatedRoom;
       setOnlineRoom(updatedRoom);
 
       // Keep player list in sync
@@ -86,9 +87,9 @@ export default function App() {
         color: p.color,
         accentColor: p.accentColor,
         role: p.role,
-        points: p.points,
-        reputation: p.reputation,
-        position: p.position,
+        points: Number(p.points) || 0,
+        reputation: p.reputation ?? 50,
+        position: p.position ?? 0,
         isFinished: p.isFinished,
         finishRank: p.finishRank,
         skipNextTurn: p.skipNextTurn,
@@ -122,6 +123,18 @@ export default function App() {
       }
     };
 
+    const onQuestionAnswered = (questionAnswer: any) => {
+      setOnlineRoom((prev) => {
+        if (!prev) return null;
+        const updated = {
+          ...prev,
+          activeQuestionAnswer: questionAnswer,
+        };
+        onlineRoomRef.current = updated;
+        return updated;
+      });
+    };
+
     const onRouletteSpun = ({ steps, playerId, playerName }: { steps: number; playerId: string; playerName: string }) => {
       // Quem girou já viu a própria animação; só os demais jogadores assistem.
       if (playerId === myOnlinePlayerRef.current?.id) return;
@@ -141,11 +154,13 @@ export default function App() {
     };
 
     socket.on('room:updated', onRoomUpdated);
+    socket.on('game:question_answered', onQuestionAnswered);
     socket.on('game:roulette_spun', onRouletteSpun);
     socket.on('chat:received', onChatReceived);
 
     return () => {
       socket.off('room:updated', onRoomUpdated);
+      socket.off('game:question_answered', onQuestionAnswered);
       socket.off('game:roulette_spun', onRouletteSpun);
       socket.off('chat:received', onChatReceived);
     };
@@ -358,50 +373,103 @@ export default function App() {
       const explanation = matchedOption?.explanation || currentEvent.question.options.find((o) => o.isCorrect)?.explanation || '';
       const legalBasis = matchedOption?.legalBasis || currentEvent.legalContext || 'CLT/CF/88';
 
-      if (!socket.connected) {
-        socket.connect();
-      }
+      const payload = {
+        roomId: onlineRoom.roomId,
+        optionId,
+        optionText,
+        isCorrect,
+        pointsEarned,
+        penalty: 0,
+        explanation,
+        legalBasis,
+        playerToken: getPlayerToken(),
+      };
 
       let settled = false;
-      const timeoutTimer = setTimeout(() => {
+
+      const finishSuccess = () => {
         if (!settled) {
           settled = true;
-          // Se a sala já foi atualizada com a resposta, considera sucesso
-          if (onlineRoomRef.current?.activeQuestionAnswer) {
-            resolve({ ok: true });
-          } else {
-            resolve({ ok: false, error: 'Sem resposta do servidor. Confira a conexão e tente de novo.' });
-          }
+          cleanup();
+          resolve({ ok: true });
         }
-      }, 10000);
+      };
 
-      socket.emit(
-        'game:answer_question',
-        {
-          roomId: onlineRoom.roomId,
-          optionId,
-          optionText,
-          isCorrect,
-          pointsEarned,
-          penalty: 0,
-          explanation,
-          legalBasis,
-          playerToken: getPlayerToken(),
-        },
-        (res?: { ok: boolean; error?: string }) => {
-          if (!settled) {
-            settled = true;
-            clearTimeout(timeoutTimer);
-            resolve(res ?? { ok: true });
+      const finishError = (msg: string) => {
+        if (!settled) {
+          settled = true;
+          cleanup();
+          resolve({ ok: false, error: msg });
+        }
+      };
+
+      // Recebe confirmação direta via evento emitido pelo servidor
+      const onAnswerAck = (ackData?: { ok: boolean; error?: string }) => {
+        if (ackData && !ackData.ok) {
+          finishError(ackData.error || 'Erro ao registrar resposta.');
+        } else {
+          finishSuccess();
+        }
+      };
+
+      const onQuestionAnswered = () => {
+        finishSuccess();
+      };
+
+      const cleanup = () => {
+        socket.off('game:answer_ack', onAnswerAck);
+        socket.off('game:question_answered', onQuestionAnswered);
+        clearTimeout(fallbackTimer);
+      };
+
+      socket.once('game:answer_ack', onAnswerAck);
+      socket.once('game:question_answered', onQuestionAnswered);
+
+      // 1. Envio primário via WebSocket com ack callback
+      socket.emit('game:answer_question', payload, (res?: { ok: boolean; error?: string }) => {
+        if (res?.ok) {
+          finishSuccess();
+        } else if (res && !res.ok) {
+          finishError(res.error || 'Erro ao processar resposta.');
+        }
+      });
+
+      // 2. Se o socket oscilar e não confirmar em 1.5s, aciona o fallback HTTP REST instantâneo
+      const fallbackTimer = setTimeout(async () => {
+        if (settled) return;
+
+        // Se a sala já foi atualizada nesse meio tempo, considera resolvido
+        if (onlineRoomRef.current?.activeQuestionAnswer) {
+          finishSuccess();
+          return;
+        }
+
+        try {
+          const resp = await fetch(`/api/rooms/${encodeURIComponent(onlineRoom.roomId)}/answer`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify(payload),
+          });
+          const data = await resp.json();
+          if (data && data.ok) {
+            finishSuccess();
+          } else {
+            finishError(data?.error || 'Não foi possível confirmar a resposta.');
+          }
+        } catch {
+          if (onlineRoomRef.current?.activeQuestionAnswer) {
+            finishSuccess();
+          } else {
+            finishError('Sem resposta do servidor. Confira a conexão e tente de novo.');
           }
         }
-      );
+      }, 1500);
     });
 
   const handleContinueOnline = () => {
     if (!onlineRoom) return;
 
-    if (activePlayer && (activePlayer.position || 1) >= FINISH_TILE_ID && !activePlayer.isFinished) {
+    if (activePlayer && (activePlayer.position ?? 0) >= FINISH_TILE_ID && !activePlayer.isFinished) {
       const finishedCount = players.filter((p) => p.isFinished).length;
       socket.emit('game:player_finished', {
         roomId: onlineRoom.roomId,
@@ -410,7 +478,10 @@ export default function App() {
       });
     }
 
-    socket.emit('game:close_event', { roomId: onlineRoom.roomId });
+    socket.emit('game:close_event', {
+      roomId: onlineRoom.roomId,
+      playerToken: getPlayerToken(),
+    });
     setIsEventModalOpen(false);
   };
 
@@ -592,8 +663,8 @@ export default function App() {
               accentColor: p.accentColor,
               role: p.role,
               points: Number(p.points) || 0,
-              reputation: p.reputation,
-              position: p.position || 1,
+              reputation: p.reputation ?? 50,
+              position: p.position ?? 0,
               isFinished: p.isFinished,
               finishRank: p.finishRank,
               skipNextTurn: p.skipNextTurn,
@@ -725,7 +796,7 @@ export default function App() {
           >
             <div className="flex items-center justify-between pb-2 border-b border-slate-800">
               <span className="text-xs font-bold text-amber-400 uppercase tracking-wider">
-                Casa #{inspectTile.id === 1 ? '00' : inspectTile.id} da Trilha
+                Casa #{inspectTile.id.toString().padStart(2, '0')} da Trilha
               </span>
               <button
                 type="button"

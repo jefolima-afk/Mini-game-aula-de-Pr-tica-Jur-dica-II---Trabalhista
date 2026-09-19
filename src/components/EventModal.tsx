@@ -149,8 +149,8 @@ export const EventModal: React.FC<EventModalProps> = ({
       setSubmitError(null);
       setIsPendingSubmit(true);
       const res = await onSubmitOnlineAnswer(chosen.id, chosen.text);
+      setIsPendingSubmit(false);
       if (!res.ok) {
-        setIsPendingSubmit(false);
         setSubmitError(res.error || 'Não foi possível enviar a resposta.');
       }
     } else {

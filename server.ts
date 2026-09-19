@@ -172,6 +172,92 @@ app.get('/api/rooms/:roomId', (req, res) => {
   });
 });
 
+// Resposta à pergunta via HTTP REST (Fallback de alta resiliência caso o WebSocket oscile)
+app.post('/api/rooms/:roomId/answer', (req, res) => {
+  try {
+    const targetRoomId = (req.params.roomId || '').toString().trim().toUpperCase();
+    const room = rooms.get(targetRoomId);
+    if (!room) {
+      return res.status(404).json({ ok: false, error: 'Sala não encontrada.' });
+    }
+
+    const activePlayer = room.players[room.activePlayerIndex];
+    if (!activePlayer) {
+      return res.status(400).json({ ok: false, error: 'Jogador da vez não encontrado.' });
+    }
+
+    if (room.activeQuestionAnswer) {
+      return res.json({ ok: true, answer: room.activeQuestionAnswer, alreadyAnswered: true });
+    }
+
+    const { optionId, optionText, isCorrect, pointsEarned, penalty, explanation, legalBasis } = req.body || {};
+    const question = room.currentEvent?.question;
+    const matchedOption = question?.options?.find(
+      (opt: any) => opt.id === optionId || opt.text === optionId || opt.text === optionText
+    );
+
+    const correct = matchedOption ? !!matchedOption.isCorrect : !!isCorrect;
+    const points = matchedOption ? (question?.pointsReward || pointsEarned || 20) : (pointsEarned || 20);
+    const chosenText = String(matchedOption ? matchedOption.text : (optionText || optionId || ''));
+    const chosenId = String(matchedOption ? matchedOption.id : (optionId || ''));
+    const expl = String(matchedOption?.explanation || explanation || question?.explanation || '');
+    const basis = String(matchedOption?.legalBasis || legalBasis || room.currentEvent?.legalContext || 'CLT/CF/88');
+
+    activePlayer.questionsAnsweredCount = (activePlayer.questionsAnsweredCount || 0) + 1;
+    if (correct) {
+      activePlayer.correctAnswersCount = (activePlayer.correctAnswersCount || 0) + 1;
+      activePlayer.points = (Number(activePlayer.points) || 0) + points;
+      activePlayer.reputation = Math.min(100, (activePlayer.reputation || 50) + 5);
+      room.logs.unshift({
+        id: `log-${Date.now()}`,
+        playerId: activePlayer.id,
+        playerName: activePlayer.name,
+        playerColor: activePlayer.color,
+        text: `Acertou a questão! Escolheu "${chosenText.slice(0, 40)}..." e ganhou +${points} pontos. Fundamento: ${basis}`,
+        type: 'event',
+        timestamp: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
+      });
+    } else {
+      if (penalty) {
+        activePlayer.points = Math.max(0, (Number(activePlayer.points) || 0) - penalty);
+      }
+      room.logs.unshift({
+        id: `log-${Date.now()}`,
+        playerId: activePlayer.id,
+        playerName: activePlayer.name,
+        playerColor: activePlayer.color,
+        text: `Errou a questão ao escolher "${chosenText.slice(0, 40)}...". ${expl ? `Explicação: ${expl}` : ''}`,
+        type: 'event',
+        timestamp: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
+      });
+    }
+
+    const questionAnswer: ActiveQuestionAnswer = {
+      playerId: activePlayer.id,
+      playerName: activePlayer.name,
+      playerAvatar: activePlayer.avatar,
+      playerColor: activePlayer.color,
+      selectedOptionId: chosenId,
+      selectedOptionText: chosenText,
+      isCorrect: correct,
+      pointsEarned: correct ? points : 0,
+      explanation: expl,
+      legalBasis: basis,
+    };
+
+    room.activeQuestionAnswer = questionAnswer;
+
+    io.to(room.roomId).emit('game:answer_ack', { ok: true, answer: questionAnswer });
+    io.to(room.roomId).emit('game:question_answered', questionAnswer);
+    io.to(room.roomId).emit('room:updated', room);
+
+    return res.json({ ok: true, answer: questionAnswer });
+  } catch (err: any) {
+    console.error('Error in REST answer endpoint:', err);
+    return res.status(500).json({ ok: false, error: err?.message || 'Erro interno ao registrar resposta.' });
+  }
+});
+
 // Socket.io Real-Time Synchronization
 io.on('connection', (socket: Socket) => {
   let currentRoomId: string | null = null;
@@ -201,7 +287,7 @@ io.on('connection', (socket: Socket) => {
         role: role || 'Coordenador(a) / Host',
         isHost: true,
         points: 0,
-        reputation: 100,
+        reputation: 50,
         position: 0,
         isFinished: false,
         questionsAnsweredCount: 0,
@@ -331,7 +417,7 @@ io.on('connection', (socket: Socket) => {
           role: data.role || 'Estudante de Direito',
           isHost: false,
           points: 0,
-          reputation: 100,
+          reputation: 50,
           position: 0,
           isFinished: false,
           questionsAnsweredCount: 0,
@@ -397,11 +483,11 @@ io.on('connection', (socket: Socket) => {
       room.phase = 'playing';
       room.activePlayerIndex = 0;
       room.round = 1;
-      // reset player positions to start tile
+      // reset player positions to start tile (Casa 00: Ponto de Partida)
       room.players.forEach((p) => {
-        p.position = 1;
+        p.position = 0;
         p.points = 0;
-        p.reputation = 100;
+        p.reputation = 50;
         p.isFinished = false;
         p.finishRank = undefined;
         p.skipNextTurn = false;
@@ -608,8 +694,10 @@ io.on('connection', (socket: Socket) => {
 
       // Responde imediatamente ao cliente que enviou para liberar a tela
       reply({ ok: true });
+      socket.emit('game:answer_ack', { ok: true, answer: questionAnswer });
 
       // Emite atualização para toda a sala
+      io.to(room.roomId).emit('game:answer_ack', { ok: true, answer: questionAnswer });
       io.to(room.roomId).emit('game:question_answered', questionAnswer);
       io.to(room.roomId).emit('room:updated', room);
     } catch (err: any) {
@@ -687,7 +775,7 @@ io.on('connection', (socket: Socket) => {
   });
 
   // 8. Close Event and Advance Turn
-  socket.on('game:close_event', ({ roomId }) => {
+  socket.on('game:close_event', ({ roomId, playerToken }) => {
     const targetRoomId = (roomId || '').toString().trim().toUpperCase();
     const room = rooms.get(targetRoomId) || rooms.get(roomId);
     if (!room) return;
@@ -698,7 +786,7 @@ io.on('connection', (socket: Socket) => {
     const activePlayer = room.players[room.activePlayerIndex];
     // Security: Only active player or room host can advance turn
     const isAuthorized = !activePlayer ||
-      isActivePlayerSocket(room, socket.id) ||
+      isActivePlayerSocket(room, socket.id, playerToken) ||
       socket.id === room.hostSocketId;
     if (!isAuthorized) {
       console.warn(`[Multiplayer Security] game:close_event rejected from unauthorized socket ${socket.id}`);
