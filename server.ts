@@ -165,7 +165,7 @@ io.on('connection', (socket: Socket) => {
       accentColor: '#FBBF24',
       role: role || 'Coordenador(a) / Host',
       isHost: true,
-      points: 1000,
+      points: 0,
       reputation: 100,
       position: 1,
       isFinished: false,
@@ -290,7 +290,7 @@ io.on('connection', (socket: Socket) => {
         accentColor: '#60A5FA',
         role: role || 'Estudante de Direito',
         isHost: false,
-        points: 1000,
+        points: 0,
         reputation: 100,
         position: 1,
         isFinished: false,
@@ -348,7 +348,7 @@ io.on('connection', (socket: Socket) => {
     // reset player positions to start tile
     room.players.forEach((p) => {
       p.position = 1;
-      p.points = 1000;
+      p.points = 0;
       p.reputation = 100;
       p.isFinished = false;
       p.finishRank = undefined;
