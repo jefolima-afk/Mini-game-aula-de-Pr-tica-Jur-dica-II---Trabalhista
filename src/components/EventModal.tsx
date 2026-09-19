@@ -67,21 +67,19 @@ export const EventModal: React.FC<EventModalProps> = ({
   const [selectedChoice, setSelectedChoice] = useState<EventChoice | null>(null);
 
   useEffect(() => {
-    if (isOpen && event) {
-      setSelectedOptionId(null);
-      setIsAnswerSubmitted(false);
-      setIsCorrectAnswer(false);
-      setIsPendingSubmit(false);
-      setSelectedChoice(null);
-      setBonusChoice('points');
-
-      if (event.type === 'bonus') {
-        sound.playCashSound();
-      } else {
-        sound.playStepSound();
-      }
-    }
-  }, [isOpen, event]);
+  if (isOpen && event) {
+    setSelectedOptionId(null);
+    setIsAnswerSubmitted(false);
+    setIsCorrectAnswer(false);
+    setIsPendingSubmit(false);
+    setSubmitError(null);
+    setSelectedChoice(null);
+    setBonusChoice('points');
+    // ...sons como já estão
+  }
+}, [isOpen, event?.id]);
+  
+  const [submitError, setSubmitError] = useState<string | null>(null);
 
   // Synchronize when activeQuestionAnswer is received from server
   useEffect(() => {
@@ -136,22 +134,24 @@ export const EventModal: React.FC<EventModalProps> = ({
   };
 
   // Confirm Question Answer (Unified for Online and Offline)
-  const handleConfirmAnswer = () => {
-    if (!event.question || !selectedOptionId || isQuestionAnswered || isPendingSubmit) return;
+  const handleConfirmAnswer = async () => {
+  if (!event.question || !selectedOptionId || isQuestionAnswered || isPendingSubmit) return;
+  const chosen = event.question.options.find((opt) => opt.id === selectedOptionId);
+  if (!chosen) return;
 
-    const chosen = event.question.options.find((opt) => opt.id === selectedOptionId);
-    if (!chosen) return;
-
-    if (isOnline) {
-      if (!isMyTurn) return;
-      setIsPendingSubmit(true);
-      if (onSubmitOnlineAnswer) {
-        onSubmitOnlineAnswer(chosen.id, chosen.text);
-      }
-    } else {
-      handleSubmitAnswerOffline();
+  if (isOnline) {
+    if (!isMyTurn || !onSubmitOnlineAnswer) return;
+    setSubmitError(null);
+    setIsPendingSubmit(true);
+    const res = await onSubmitOnlineAnswer(chosen.id, chosen.text);
+    if (!res.ok) {
+      setIsPendingSubmit(false);
+      setSubmitError(res.error || 'Não foi possível enviar a resposta.');
     }
-  };
+  } else {
+    handleSubmitAnswerOffline();
+  }
+};
 
   // Confirm and close after answering question
   const handleConfirmQuestionOutcome = () => {
@@ -511,7 +511,12 @@ export const EventModal: React.FC<EventModalProps> = ({
                     );
                   })}
                 </div>
-
+                
+{submitError && (
+  <div className="p-2.5 rounded-xl bg-rose-950/40 border border-rose-500/50 text-rose-200 text-xs">
+    {submitError}
+  </div>
+)}
                 {/* Feedback & Grounded Legal Basis after Answer */}
                 {isQuestionAnswered && (
                   <motion.div
