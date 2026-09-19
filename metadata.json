@@ -1,0 +1,6 @@
+{
+  "name": "Prática do Trabalho",
+  "description": "Jogo de tabuleiro acadêmico para turmas de Direito da CESURG com foco em Prática do Trabalho, questões da CLT e CF/88, casas bônus e roleta interativa.",
+  "requestFramePermissions": [],
+  "majorCapabilities": ["MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"]
+}
