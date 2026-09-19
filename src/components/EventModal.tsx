@@ -5,14 +5,15 @@ import {
   HelpCircle, 
   CheckCircle2, 
   XCircle, 
-  BookOpen, 
   ArrowRight, 
   Trophy, 
   FileText,
   Zap,
-  Footprints
+  Footprints,
+  Clock,
+  UserCheck
 } from 'lucide-react';
-import { LawGameEvent, Player, Tile, QuestionOption, EventChoice } from '../types';
+import { LawGameEvent, Player, Tile, QuestionOption, EventChoice, ActiveQuestionAnswer } from '../types';
 import { sound } from '../utils/audio';
 
 interface EventModalProps {
@@ -30,6 +31,12 @@ interface EventModalProps {
     wasCorrect?: boolean;
     isQuestion?: boolean;
   }) => void;
+  isOnline?: boolean;
+  isMyTurn?: boolean;
+  isHost?: boolean;
+  activeQuestionAnswer?: ActiveQuestionAnswer | null;
+  onSubmitOnlineAnswer?: (optionId: string, optionText: string) => void;
+  onContinueOnline?: () => void;
 }
 
 export const EventModal: React.FC<EventModalProps> = ({
@@ -38,11 +45,18 @@ export const EventModal: React.FC<EventModalProps> = ({
   player,
   tile,
   onResolve,
+  isOnline = false,
+  isMyTurn = true,
+  isHost = false,
+  activeQuestionAnswer = null,
+  onSubmitOnlineAnswer,
+  onContinueOnline,
 }) => {
-  // Question state
+  // Local question state for offline / optimistic selection
   const [selectedOptionId, setSelectedOptionId] = useState<string | null>(null);
   const [isAnswerSubmitted, setIsAnswerSubmitted] = useState<boolean>(false);
   const [isCorrectAnswer, setIsCorrectAnswer] = useState<boolean>(false);
+  const [isPendingSubmit, setIsPendingSubmit] = useState<boolean>(false);
 
   // Bonus choice state: 'points' (+15 pts) or 'steps' (+2 casas)
   const [bonusChoice, setBonusChoice] = useState<'points' | 'steps'>('points');
@@ -55,6 +69,7 @@ export const EventModal: React.FC<EventModalProps> = ({
       setSelectedOptionId(null);
       setIsAnswerSubmitted(false);
       setIsCorrectAnswer(false);
+      setIsPendingSubmit(false);
       setSelectedChoice(null);
       setBonusChoice('points');
 
@@ -66,16 +81,55 @@ export const EventModal: React.FC<EventModalProps> = ({
     }
   }, [isOpen, event]);
 
+  // Synchronize when activeQuestionAnswer is received from server
+  useEffect(() => {
+    if (activeQuestionAnswer) {
+      setIsAnswerSubmitted(true);
+      setIsCorrectAnswer(activeQuestionAnswer.isCorrect);
+      setIsPendingSubmit(false);
+    }
+  }, [activeQuestionAnswer]);
+
   if (!isOpen || !event) return null;
+
+  // Effective answer state (derived from server if online, or local if offline)
+  const isQuestionAnswered = isOnline ? !!activeQuestionAnswer : isAnswerSubmitted;
+  const answeredOptionId = isOnline
+    ? activeQuestionAnswer?.selectedOptionId
+    : selectedOptionId;
+  const answeredOptionText = isOnline
+    ? activeQuestionAnswer?.selectedOptionText
+    : event.question?.options.find((o) => o.id === selectedOptionId)?.text;
+  const isAnswerCorrect = isOnline
+    ? !!activeQuestionAnswer?.isCorrect
+    : isCorrectAnswer;
+  const answeredByName = isOnline
+    ? activeQuestionAnswer?.playerName || player.name
+    : player.name;
 
   // Handle Question Option Selection
   const handleSelectOption = (option: QuestionOption) => {
-    if (isAnswerSubmitted) return;
-    setSelectedOptionId(option.id);
+    if (isQuestionAnswered || isPendingSubmit) return;
+
+    if (isOnline) {
+      // In online mode: only active player can answer
+      if (!isMyTurn) return;
+
+      setSelectedOptionId(option.id);
+      setIsPendingSubmit(true);
+
+      // Dispatch answer directly to server
+      if (onSubmitOnlineAnswer) {
+        onSubmitOnlineAnswer(option.id, option.text);
+      }
+    } else {
+      // Local mode: select option and wait for confirmation button
+      setSelectedOptionId(option.id);
+    }
   };
 
-  // Submit Question Answer
-  const handleSubmitAnswer = () => {
+  // Submit Question Answer (Offline Mode)
+  const handleSubmitAnswerOffline = () => {
     if (!event.question || !selectedOptionId || isAnswerSubmitted) return;
 
     const chosen = event.question.options.find((opt) => opt.id === selectedOptionId);
@@ -93,6 +147,11 @@ export const EventModal: React.FC<EventModalProps> = ({
 
   // Confirm and close after answering question
   const handleConfirmQuestionOutcome = () => {
+    if (isOnline && onContinueOnline) {
+      onContinueOnline();
+      return;
+    }
+
     if (!event.question) return;
 
     const chosen = event.question.options.find((opt) => opt.id === selectedOptionId);
@@ -113,6 +172,11 @@ export const EventModal: React.FC<EventModalProps> = ({
 
   // Handle Bonus Confirmation
   const handleConfirmBonus = () => {
+    if (isOnline && onContinueOnline) {
+      onContinueOnline();
+      return;
+    }
+
     if (!event.bonus) return;
 
     if (bonusChoice === 'points') {
@@ -139,12 +203,18 @@ export const EventModal: React.FC<EventModalProps> = ({
 
   // Handle Dilemma Choice Selection & Resolve
   const handleSelectDilemmaChoice = (choice: EventChoice) => {
+    if (isOnline && !isMyTurn) return;
     setSelectedChoice(choice);
     sound.playCashSound();
   };
 
   const handleConfirmDilemma = () => {
     if (!selectedChoice) return;
+
+    if (isOnline && onContinueOnline) {
+      onContinueOnline();
+      return;
+    }
 
     onResolve({
       pointsDelta: selectedChoice.points || 0,
@@ -156,7 +226,9 @@ export const EventModal: React.FC<EventModalProps> = ({
     });
   };
 
-  const selectedOption = event.question?.options.find((o) => o.id === selectedOptionId);
+  const selectedOption = event.question?.options.find(
+    (o) => o.id === answeredOptionId || o.text === answeredOptionText
+  );
 
   // Level Badge helper
   const renderLevelBadge = () => {
@@ -217,8 +289,17 @@ export const EventModal: React.FC<EventModalProps> = ({
                 {player.avatar || '⚖️'}
               </div>
               <div>
-                <div className="text-[11px] font-semibold text-slate-400">Vez de Responder</div>
-                <div className="text-sm font-bold text-white tracking-wide">{player.name}</div>
+                <div className="text-[11px] font-semibold text-slate-400">
+                  {isOnline ? (isMyTurn ? 'Sua Vez de Jogar' : 'Vez de Responder') : 'Vez de Responder'}
+                </div>
+                <div className="text-sm font-bold text-white tracking-wide flex items-center gap-1.5">
+                  <span>{player.name}</span>
+                  {isOnline && isMyTurn && (
+                    <span className="text-[10px] font-black px-1.5 py-0.2 rounded bg-amber-400 text-slate-950">
+                      Você
+                    </span>
+                  )}
+                </div>
               </div>
             </div>
 
@@ -260,6 +341,45 @@ export const EventModal: React.FC<EventModalProps> = ({
             {/* CASE 1: QUESTION TYPE */}
             {event.type === 'question' && event.question && (
               <div className="space-y-3 pt-1">
+                {/* Multiplayer Status Indicator */}
+                {isOnline && !isQuestionAnswered && (
+                  <div
+                    className={`p-3 rounded-xl border flex items-center justify-between gap-2 ${
+                      isMyTurn
+                        ? 'bg-blue-500/15 border-blue-500/40 text-blue-200'
+                        : 'bg-amber-500/10 border-amber-500/30 text-amber-200'
+                    }`}
+                  >
+                    <div className="flex items-center gap-2">
+                      {isMyTurn ? (
+                        <>
+                          <span className="w-2.5 h-2.5 rounded-full bg-blue-400 animate-ping" />
+                          <span className="text-xs sm:text-sm font-bold text-white">
+                            É a sua vez de responder! Escolha uma alternativa:
+                          </span>
+                        </>
+                      ) : (
+                        <>
+                          <Clock className="w-4 h-4 text-amber-400 animate-spin" />
+                          <span className="text-xs sm:text-sm font-semibold">
+                            É a vez de <strong className="text-amber-300">{player.name}</strong> responder.
+                          </span>
+                        </>
+                      )}
+                    </div>
+                    <span
+                      className={`text-[10px] font-black uppercase tracking-wider px-2 py-0.5 rounded ${
+                        isMyTurn
+                          ? 'bg-blue-500/20 text-blue-300 border border-blue-400/40'
+                          : 'bg-amber-500/20 text-amber-300 border border-amber-400/40'
+                      }`}
+                    >
+                      {isMyTurn ? 'Sua Vez' : 'Aguardando'}
+                    </span>
+                  </div>
+                )}
+
+                {/* Question Statement Box */}
                 <div className="p-3 rounded-xl bg-blue-950/30 border border-blue-500/40">
                   <div className="text-xs font-bold text-blue-300 uppercase tracking-wider mb-1 flex items-center justify-between">
                     <span>Questão de Prova</span>
@@ -273,19 +393,38 @@ export const EventModal: React.FC<EventModalProps> = ({
                 {/* Multiple choice options */}
                 <div className="space-y-2">
                   {event.question.options.map((opt) => {
-                    const isSelected = selectedOptionId === opt.id;
-                    let optionStyle = 'border-slate-700 bg-slate-800/60 hover:bg-slate-800 text-slate-200';
+                    const isChosenOption =
+                      answeredOptionId === opt.id ||
+                      answeredOptionText === opt.text ||
+                      selectedOptionId === opt.id;
 
-                    if (isAnswerSubmitted) {
-                      if (opt.isCorrect) {
-                        optionStyle = 'border-emerald-500 bg-emerald-950/60 text-emerald-100 shadow-md shadow-emerald-900/30 ring-1 ring-emerald-400';
-                      } else if (isSelected && !opt.isCorrect) {
-                        optionStyle = 'border-rose-500 bg-rose-950/60 text-rose-100 shadow-md shadow-rose-900/30 ring-1 ring-rose-400';
+                    const canClickOption = !isQuestionAnswered && !isPendingSubmit && (!isOnline || isMyTurn);
+
+                    let optionStyle = 'border-slate-700 bg-slate-800/60 hover:bg-slate-800 text-slate-200 cursor-pointer';
+
+                    if (isQuestionAnswered) {
+                      if (isChosenOption) {
+                        if (opt.isCorrect) {
+                          optionStyle =
+                            'border-emerald-500 bg-emerald-950/70 text-emerald-100 ring-2 ring-emerald-400 shadow-md shadow-emerald-900/30 cursor-default';
+                        } else {
+                          optionStyle =
+                            'border-rose-500 bg-rose-950/70 text-rose-100 ring-2 ring-rose-400 shadow-md shadow-rose-900/30 cursor-default';
+                        }
+                      } else if (opt.isCorrect && !isAnswerCorrect) {
+                        // Reveal correct answer if player got it wrong
+                        optionStyle =
+                          'border-emerald-500/80 bg-emerald-950/40 text-emerald-200 ring-1 ring-emerald-400/60 cursor-default';
                       } else {
-                        optionStyle = 'border-slate-800 bg-slate-900/40 text-slate-500 opacity-60';
+                        optionStyle = 'border-slate-800 bg-slate-900/40 text-slate-500 opacity-50 cursor-default';
                       }
-                    } else if (isSelected) {
-                      optionStyle = 'border-blue-400 bg-blue-900/40 text-blue-100 ring-2 ring-blue-500/50';
+                    } else if (!canClickOption) {
+                      // Disabled state for non-active players
+                      optionStyle =
+                        'border-slate-800 bg-slate-900/50 text-slate-400 opacity-70 cursor-not-allowed';
+                    } else if (selectedOptionId === opt.id) {
+                      optionStyle =
+                        'border-blue-400 bg-blue-900/40 text-blue-100 ring-2 ring-blue-500/50 cursor-pointer';
                     }
 
                     return (
@@ -293,32 +432,57 @@ export const EventModal: React.FC<EventModalProps> = ({
                         key={opt.id}
                         type="button"
                         onClick={() => handleSelectOption(opt)}
-                        disabled={isAnswerSubmitted}
-                        className={`w-full text-left p-3.5 rounded-xl border transition-all flex items-start gap-3 cursor-pointer disabled:cursor-default ${optionStyle}`}
+                        disabled={!canClickOption}
+                        className={`w-full text-left p-3.5 rounded-xl border transition-all flex items-start gap-3 disabled:cursor-not-allowed ${optionStyle}`}
                       >
                         <div className="mt-0.5 flex-shrink-0">
-                          {isAnswerSubmitted ? (
-                            opt.isCorrect ? (
-                              <CheckCircle2 className="w-5 h-5 text-emerald-400" />
-                            ) : isSelected ? (
-                              <XCircle className="w-5 h-5 text-rose-400" />
+                          {isQuestionAnswered ? (
+                            isChosenOption ? (
+                              opt.isCorrect ? (
+                                <CheckCircle2 className="w-5 h-5 text-emerald-400" />
+                              ) : (
+                                <XCircle className="w-5 h-5 text-rose-400" />
+                              )
+                            ) : opt.isCorrect ? (
+                              <CheckCircle2 className="w-5 h-5 text-emerald-400/80" />
                             ) : (
                               <div className="w-5 h-5 rounded-full border border-slate-700" />
                             )
                           ) : (
                             <div
                               className={`w-5 h-5 rounded-full border flex items-center justify-center text-xs font-bold ${
-                                isSelected
+                                selectedOptionId === opt.id
                                   ? 'border-blue-400 bg-blue-500 text-white'
-                                  : 'border-slate-600 text-slate-400'
+                                  : canClickOption
+                                  ? 'border-slate-600 text-slate-400'
+                                  : 'border-slate-700 text-slate-600'
                               }`}
                             >
                               {opt.text.slice(0, 1)}
                             </div>
                           )}
                         </div>
-                        <div className="flex-1 text-sm font-medium leading-snug">
-                          {opt.text}
+
+                        <div className="flex-1 text-sm font-medium leading-snug space-y-1">
+                          <div>{opt.text}</div>
+                          {isQuestionAnswered && isChosenOption && (
+                            <div className="inline-flex items-center gap-1 text-[11px] font-bold">
+                              {opt.isCorrect ? (
+                                <span className="text-emerald-400 bg-emerald-500/10 px-2 py-0.5 rounded border border-emerald-500/30">
+                                  {answeredByName} escolheu esta alternativa (CORRETA!)
+                                </span>
+                              ) : (
+                                <span className="text-rose-400 bg-rose-500/10 px-2 py-0.5 rounded border border-rose-500/30">
+                                  {answeredByName} escolheu esta alternativa (INCORRETA)
+                                </span>
+                              )}
+                            </div>
+                          )}
+                          {isQuestionAnswered && !isChosenOption && opt.isCorrect && !isAnswerCorrect && (
+                            <div className="inline-flex items-center gap-1 text-[11px] font-bold text-emerald-400 bg-emerald-500/10 px-2 py-0.5 rounded border border-emerald-500/30">
+                              Gabarito Oficial (Resposta Correta)
+                            </div>
+                          )}
                         </div>
                       </button>
                     );
@@ -326,36 +490,41 @@ export const EventModal: React.FC<EventModalProps> = ({
                 </div>
 
                 {/* Feedback & Grounded Legal Basis after Answer */}
-                {isAnswerSubmitted && selectedOption && (
+                {isQuestionAnswered && (
                   <motion.div
                     initial={{ opacity: 0, y: 10 }}
                     animate={{ opacity: 1, y: 0 }}
                     className={`p-3.5 rounded-xl border ${
-                      isCorrectAnswer
+                      isAnswerCorrect
                         ? 'bg-emerald-950/40 border-emerald-500/50 text-emerald-200'
                         : 'bg-rose-950/40 border-rose-500/50 text-rose-200'
                     }`}
                   >
                     <div className="flex items-center gap-2 font-bold text-sm mb-1">
-                      {isCorrectAnswer ? (
+                      {isAnswerCorrect ? (
                         <>
                           <CheckCircle2 className="w-5 h-5 text-emerald-400" />
-                          <span>Resposta Correta! (+{event.question.pointsReward} Pontos)</span>
+                          <span>
+                            Resposta Correta de {answeredByName}! (+{activeQuestionAnswer?.pointsEarned || event.question.pointsReward} Pontos)
+                          </span>
                         </>
                       ) : (
                         <>
                           <XCircle className="w-5 h-5 text-rose-400" />
-                          <span>Resposta Incorreta (0 Pontos)</span>
+                          <span>Resposta Incorreta de {answeredByName} (0 Pontos)</span>
                         </>
                       )}
                     </div>
                     <div className="text-xs text-slate-300 leading-relaxed mb-2">
-                      {selectedOption.explanation}
+                      {activeQuestionAnswer?.explanation || selectedOption?.explanation || event.question.options.find(o => o.isCorrect)?.explanation}
                     </div>
-                    {event.legalContext && (
+                    {(activeQuestionAnswer?.legalBasis || event.legalContext) && (
                       <div className="pt-2 border-t border-slate-800/80 text-xs text-amber-200/90 flex items-start gap-1.5">
                         <FileText className="w-3.5 h-3.5 text-amber-400 flex-shrink-0 mt-0.5" />
-                        <span><strong>Fundamentação Legal:</strong> {event.legalContext}</span>
+                        <span>
+                          <strong>Fundamentação Legal:</strong>{' '}
+                          {activeQuestionAnswer?.legalBasis || event.legalContext}
+                        </span>
                       </div>
                     )}
                   </motion.div>
@@ -363,9 +532,16 @@ export const EventModal: React.FC<EventModalProps> = ({
               </div>
             )}
 
-            {/* CASE 2: BONUS TILE (Conforme Manual das Regras) */}
+            {/* CASE 2: BONUS TILE */}
             {event.type === 'bonus' && event.bonus && (
               <div className="space-y-4 pt-1">
+                {isOnline && !isMyTurn && (
+                  <div className="p-3 rounded-xl bg-amber-500/10 border border-amber-500/30 text-amber-200 flex items-center gap-2 text-xs sm:text-sm">
+                    <Clock className="w-4 h-4 text-amber-400" />
+                    <span>Aguardando <strong>{player.name}</strong> escolher o benefício da Casa Bônus...</span>
+                  </div>
+                )}
+
                 <div className="p-4 rounded-xl bg-amber-950/30 border border-amber-500/50 space-y-2">
                   <div className="flex items-center gap-2 text-amber-400 font-black text-base">
                     <Sparkles className="w-5 h-5 text-amber-400" />
@@ -385,8 +561,11 @@ export const EventModal: React.FC<EventModalProps> = ({
                     <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
                       <button
                         type="button"
+                        disabled={isOnline && !isMyTurn}
                         onClick={() => setBonusChoice('points')}
-                        className={`p-3.5 rounded-xl border text-left transition-all cursor-pointer flex flex-col gap-1.5 ${
+                        className={`p-3.5 rounded-xl border text-left transition-all flex flex-col gap-1.5 ${
+                          isOnline && !isMyTurn ? 'cursor-not-allowed opacity-75' : 'cursor-pointer'
+                        } ${
                           bonusChoice === 'points'
                             ? 'border-amber-400 bg-amber-950/40 ring-2 ring-amber-400/50 text-white'
                             : 'border-slate-700 bg-slate-800/60 hover:bg-slate-800 text-slate-300'
@@ -410,8 +589,11 @@ export const EventModal: React.FC<EventModalProps> = ({
 
                       <button
                         type="button"
+                        disabled={isOnline && !isMyTurn}
                         onClick={() => setBonusChoice('steps')}
-                        className={`p-3.5 rounded-xl border text-left transition-all cursor-pointer flex flex-col gap-1.5 ${
+                        className={`p-3.5 rounded-xl border text-left transition-all flex flex-col gap-1.5 ${
+                          isOnline && !isMyTurn ? 'cursor-not-allowed opacity-75' : 'cursor-pointer'
+                        } ${
                           bonusChoice === 'steps'
                             ? 'border-cyan-400 bg-cyan-950/40 ring-2 ring-cyan-400/50 text-white'
                             : 'border-slate-700 bg-slate-800/60 hover:bg-slate-800 text-slate-300'
@@ -441,6 +623,13 @@ export const EventModal: React.FC<EventModalProps> = ({
             {/* CASE 3: DILEMMA TYPE */}
             {event.type === 'dilemma' && event.choices && (
               <div className="space-y-3 pt-1">
+                {isOnline && !isMyTurn && (
+                  <div className="p-3 rounded-xl bg-pink-500/10 border border-pink-500/30 text-pink-200 flex items-center gap-2 text-xs sm:text-sm">
+                    <Clock className="w-4 h-4 text-pink-400" />
+                    <span>Aguardando <strong>{player.name}</strong> decidir a conduta ética...</span>
+                  </div>
+                )}
+
                 <div className="flex items-center gap-1.5 text-xs font-bold text-slate-400 uppercase tracking-wider">
                   <HelpCircle className="w-3.5 h-3.5 text-pink-400" />
                   <span>Selecione a conduta jurídica a ser adotada:</span>
@@ -449,29 +638,25 @@ export const EventModal: React.FC<EventModalProps> = ({
                 <div className="space-y-2.5">
                   {event.choices.map((choice, idx) => {
                     const isSelected = selectedChoice?.text === choice.text;
+                    const canSelect = !isOnline || isMyTurn;
 
                     return (
                       <button
                         key={idx}
                         type="button"
+                        disabled={!canSelect}
                         onClick={() => handleSelectDilemmaChoice(choice)}
-                        className={`w-full text-left p-3.5 rounded-xl border transition-all flex flex-col gap-1 cursor-pointer ${
+                        className={`w-full text-left p-3.5 rounded-xl border transition-all ${
+                          !canSelect ? 'cursor-not-allowed opacity-75' : 'cursor-pointer'
+                        } ${
                           isSelected
-                            ? 'border-amber-400 bg-slate-800 ring-2 ring-amber-400/50'
-                            : 'border-slate-700 bg-slate-800/60 hover:bg-slate-800 hover:border-slate-600'
+                            ? 'border-pink-500 bg-pink-950/40 text-pink-100 ring-2 ring-pink-500/50'
+                            : 'border-slate-700 bg-slate-800/60 hover:bg-slate-800 text-slate-200'
                         }`}
                       >
-                        <div className="flex items-center justify-between gap-2">
-                          <span className="font-bold text-sm text-white">{choice.text}</span>
-                          <span className="px-2 py-0.5 rounded-full text-[10px] font-extrabold bg-amber-500/20 text-amber-300 border border-amber-500/30">
-                            +{choice.points} pts
-                          </span>
-                        </div>
-                        <span className="text-xs text-slate-400">{choice.outcomeDesc}</span>
-                        {choice.legalBasis && (
-                          <span className="text-[11px] text-amber-300/80 mt-1">
-                            ⚖️ {choice.legalBasis}
-                          </span>
+                        <div className="text-sm font-semibold mb-1">{choice.text}</div>
+                        {choice.outcomeDesc && (
+                          <div className="text-xs text-slate-400">{choice.outcomeDesc}</div>
                         )}
                       </button>
                     );
@@ -484,65 +669,109 @@ export const EventModal: React.FC<EventModalProps> = ({
           {/* Action Footer */}
           <div className="px-5 py-3 bg-slate-950/90 border-t border-slate-800 flex items-center justify-between gap-2">
             <div className="text-xs text-slate-400">
-              {event.type === 'question' && !isAnswerSubmitted && 'Selecione uma alternativa para validar'}
-              {event.type === 'question' && isAnswerSubmitted && 'Revise os fundamentos e continue'}
-              {event.type === 'bonus' && (event.bonus?.allowChoice ? 'Benefício selecionado pronto para aplicar' : 'Largada inicial')}
-              {event.type === 'dilemma' && (selectedChoice ? 'Conduta selecionada' : 'Escolha uma opção')}
+              {event.type === 'question' && (
+                !isQuestionAnswered
+                  ? (isOnline && !isMyTurn ? `Aguardando resposta de ${player.name}...` : 'Selecione uma alternativa para responder')
+                  : 'Resultado conferido'
+              )}
+              {event.type === 'bonus' && (
+                isOnline && !isMyTurn
+                  ? `Aguardando benefício de ${player.name}...`
+                  : (event.bonus?.allowChoice ? 'Benefício selecionado pronto para aplicar' : 'Largada inicial')
+              )}
+              {event.type === 'dilemma' && (
+                isOnline && !isMyTurn
+                  ? `Aguardando decisão de ${player.name}...`
+                  : (selectedChoice ? 'Conduta selecionada' : 'Escolha uma opção')
+              )}
             </div>
 
             {/* Question Actions */}
             {event.type === 'question' && (
               <>
-                {!isAnswerSubmitted ? (
-                  <button
-                    id="btn-submit-answer"
-                    type="button"
-                    onClick={handleSubmitAnswer}
-                    disabled={!selectedOptionId}
-                    className="px-5 py-2 rounded-xl font-bold text-sm bg-gradient-to-r from-blue-500 to-indigo-600 hover:from-blue-400 hover:to-indigo-500 text-white shadow-md disabled:opacity-50 disabled:cursor-not-allowed cursor-pointer transition-all flex items-center gap-1.5"
-                  >
-                    <span>Confirmar Resposta</span>
-                    <ArrowRight className="w-4 h-4" />
-                  </button>
+                {!isQuestionAnswered ? (
+                  !isOnline ? (
+                    <button
+                      id="btn-submit-answer"
+                      type="button"
+                      onClick={handleSubmitAnswerOffline}
+                      disabled={!selectedOptionId}
+                      className="px-5 py-2 rounded-xl font-bold text-sm bg-gradient-to-r from-blue-500 to-indigo-600 hover:from-blue-400 hover:to-indigo-500 text-white shadow-md disabled:opacity-50 disabled:cursor-not-allowed cursor-pointer transition-all flex items-center gap-1.5"
+                    >
+                      <span>Confirmar Resposta</span>
+                      <ArrowRight className="w-4 h-4" />
+                    </button>
+                  ) : isMyTurn ? (
+                    <div className="text-xs font-semibold text-blue-300 animate-pulse">
+                      Clique em uma das opções acima para responder
+                    </div>
+                  ) : (
+                    <div className="text-xs text-slate-400 flex items-center gap-1">
+                      <Clock className="w-3.5 h-3.5 text-amber-400" />
+                      <span>Na vez de {player.name}</span>
+                    </div>
+                  )
                 ) : (
-                  <button
-                    id="btn-confirm-question-continue"
-                    type="button"
-                    onClick={handleConfirmQuestionOutcome}
-                    className="px-5 py-2 rounded-xl font-bold text-sm bg-gradient-to-r from-amber-500 to-amber-600 hover:from-amber-400 hover:to-amber-500 text-slate-950 shadow-md cursor-pointer transition-all flex items-center gap-1.5"
-                  >
-                    <span>Continuar Partida</span>
-                    <ArrowRight className="w-4 h-4" />
-                  </button>
+                  // Question answered: show continue button for active player or room host
+                  (!isOnline || isMyTurn || isHost) ? (
+                    <button
+                      id="btn-confirm-question-continue"
+                      type="button"
+                      onClick={handleConfirmQuestionOutcome}
+                      className="px-5 py-2 rounded-xl font-bold text-sm bg-gradient-to-r from-amber-500 to-amber-600 hover:from-amber-400 hover:to-amber-500 text-slate-950 shadow-md cursor-pointer transition-all flex items-center gap-1.5"
+                    >
+                      <span>{isOnline && isHost && !isMyTurn ? 'Avançar Turno (Host)' : 'Continuar Partida'}</span>
+                      <ArrowRight className="w-4 h-4" />
+                    </button>
+                  ) : (
+                    <div className="text-xs text-slate-400 flex items-center gap-1.5">
+                      <UserCheck className="w-3.5 h-3.5 text-amber-400" />
+                      <span>Aguardando {player.name} continuar...</span>
+                    </div>
+                  )
                 )}
               </>
             )}
 
             {/* Bonus Actions */}
             {event.type === 'bonus' && (
-              <button
-                id="btn-confirm-bonus-benefit"
-                type="button"
-                onClick={handleConfirmBonus}
-                className="px-5 py-2 rounded-xl font-bold text-sm bg-gradient-to-r from-amber-500 to-amber-600 hover:from-amber-400 hover:to-amber-500 text-slate-950 shadow-md cursor-pointer transition-all flex items-center gap-1.5"
-              >
-                <span>{event.bonus?.allowChoice ? 'Confirmar Benefício' : 'Entendido!'}</span>
-                <ArrowRight className="w-4 h-4" />
-              </button>
+              (!isOnline || isMyTurn || isHost) ? (
+                <button
+                  id="btn-confirm-bonus-benefit"
+                  type="button"
+                  onClick={handleConfirmBonus}
+                  className="px-5 py-2 rounded-xl font-bold text-sm bg-gradient-to-r from-amber-500 to-amber-600 hover:from-amber-400 hover:to-amber-500 text-slate-950 shadow-md cursor-pointer transition-all flex items-center gap-1.5"
+                >
+                  <span>{event.bonus?.allowChoice ? 'Confirmar Benefício' : 'Entendido!'}</span>
+                  <ArrowRight className="w-4 h-4" />
+                </button>
+              ) : (
+                <div className="text-xs text-slate-400 flex items-center gap-1.5">
+                  <Clock className="w-3.5 h-3.5 text-amber-400" />
+                  <span>Aguardando {player.name}...</span>
+                </div>
+              )
             )}
 
             {/* Dilemma Actions */}
             {event.type === 'dilemma' && (
-              <button
-                id="btn-confirm-dilemma-decision"
-                type="button"
-                onClick={handleConfirmDilemma}
-                disabled={!selectedChoice}
-                className="px-5 py-2 rounded-xl font-bold text-sm bg-gradient-to-r from-pink-500 to-rose-600 hover:from-pink-400 hover:to-rose-500 text-white shadow-md disabled:opacity-50 disabled:cursor-not-allowed cursor-pointer transition-all flex items-center gap-1.5"
-              >
-                <span>Confirmar Decisão</span>
-                <ArrowRight className="w-4 h-4" />
-              </button>
+              (!isOnline || isMyTurn || isHost) ? (
+                <button
+                  id="btn-confirm-dilemma-decision"
+                  type="button"
+                  onClick={handleConfirmDilemma}
+                  disabled={!selectedChoice}
+                  className="px-5 py-2 rounded-xl font-bold text-sm bg-gradient-to-r from-pink-500 to-rose-600 hover:from-pink-400 hover:to-rose-500 text-white shadow-md disabled:opacity-50 disabled:cursor-not-allowed cursor-pointer transition-all flex items-center gap-1.5"
+                >
+                  <span>Confirmar Decisão</span>
+                  <ArrowRight className="w-4 h-4" />
+                </button>
+              ) : (
+                <div className="text-xs text-slate-400 flex items-center gap-1.5">
+                  <Clock className="w-3.5 h-3.5 text-pink-400" />
+                  <span>Aguardando {player.name}...</span>
+                </div>
+              )
             )}
           </div>
         </motion.div>

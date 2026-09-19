@@ -51,6 +51,19 @@ export interface ChatMessage {
   isSystem?: boolean;
 }
 
+export interface ActiveQuestionAnswer {
+  playerId: string;
+  playerName: string;
+  playerAvatar?: string;
+  playerColor?: string;
+  selectedOptionId: string;
+  selectedOptionText: string;
+  isCorrect: boolean;
+  pointsEarned: number;
+  explanation?: string;
+  legalBasis?: string;
+}
+
 export interface OnlineRoom {
   roomId: string;
   roomName: string;
@@ -64,6 +77,7 @@ export interface OnlineRoom {
   currentEvent: any | null;
   currentEventTile: any | null;
   isEventModalOpen: boolean;
+  activeQuestionAnswer?: ActiveQuestionAnswer | null;
   spinningNumber: number | null;
   ceremonyStep?: string;
   bottomRevealedCount?: number;
@@ -177,6 +191,7 @@ io.on('connection', (socket: Socket) => {
       currentEvent: null,
       currentEventTile: null,
       isEventModalOpen: false,
+      activeQuestionAnswer: null,
       spinningNumber: null,
       createdAt: Date.now(),
     };
@@ -343,30 +358,57 @@ io.on('connection', (socket: Socket) => {
       room.currentEvent = eventData;
       room.currentEventTile = eventTile;
       room.isEventModalOpen = true;
+      room.activeQuestionAnswer = null;
 
       io.to(roomId).emit('room:updated', room);
     }, 1800);
   });
 
-  // 5. Submit Question Answer
-  socket.on('game:answer_question', ({ roomId, optionId, isCorrect, pointsEarned, penalty, explanation, legalBasis }) => {
+  // 5. Submit Question Answer (Strict Multiplayer Validation)
+  socket.on('game:answer_question', ({ roomId, optionId, optionText, isCorrect, pointsEarned, penalty, explanation, legalBasis }) => {
     const room = rooms.get(roomId);
     if (!room || !room.isEventModalOpen) return;
 
     const activePlayer = room.players[room.activePlayerIndex];
     if (!activePlayer) return;
 
+    // MULTIPLAYER SECURITY VALIDATION:
+    // Only the active player corresponding to activePlayerIndex can answer.
+    // If sent by any other socket, reject immediately and do not alter match state.
+    const isAuthorized = activePlayer.socketId === socket.id || (currentPlayerId && activePlayer.id === currentPlayerId);
+    if (!isAuthorized) {
+      console.warn(`[Multiplayer Security] Ignored game:answer_question from unauthorized socket ${socket.id} (active player is ${activePlayer.name} [${activePlayer.id}])`);
+      return;
+    }
+
+    // Prevent duplicate answers if already answered
+    if (room.activeQuestionAnswer) {
+      console.warn(`[Multiplayer Security] Ignored duplicate answer attempt in room ${roomId}`);
+      return;
+    }
+
+    // Resolve question and option data
+    const question = room.currentEvent?.question;
+    const matchedOption = question?.options?.find((opt: any) => opt.id === optionId || opt.text === optionId || opt.text === optionText);
+
+    const correct = matchedOption ? !!matchedOption.isCorrect : !!isCorrect;
+    const points = matchedOption ? (question?.pointsReward || pointsEarned || 20) : (pointsEarned || 20);
+    const chosenText = matchedOption ? matchedOption.text : (optionText || optionId || '');
+    const chosenId = matchedOption ? matchedOption.id : (optionId || '');
+    const expl = matchedOption?.explanation || explanation || question?.explanation || '';
+    const basis = matchedOption?.legalBasis || legalBasis || room.currentEvent?.legalContext || 'CLT/CF/88';
+
     activePlayer.questionsAnsweredCount = (activePlayer.questionsAnsweredCount || 0) + 1;
-    if (isCorrect) {
+    if (correct) {
       activePlayer.correctAnswersCount = (activePlayer.correctAnswersCount || 0) + 1;
-      activePlayer.points += pointsEarned;
+      activePlayer.points += points;
       activePlayer.reputation = Math.min(100, activePlayer.reputation + 5);
       room.logs.unshift({
         id: `log-${Date.now()}`,
         playerId: activePlayer.id,
         playerName: activePlayer.name,
         playerColor: activePlayer.color,
-        text: `Acertou a questão! Ganhou +${pointsEarned} pontos. Fundamento: ${legalBasis || 'CLT/CF/88'}`,
+        text: `Acertou a questão! Escolheu "${chosenText.slice(0, 40)}..." e ganhou +${points} pontos. Fundamento: ${basis}`,
         type: 'event',
         timestamp: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
       });
@@ -379,12 +421,30 @@ io.on('connection', (socket: Socket) => {
         playerId: activePlayer.id,
         playerName: activePlayer.name,
         playerColor: activePlayer.color,
-        text: `Errou a questão. ${explanation ? `Explicação: ${explanation}` : ''}`,
+        text: `Errou a questão ao escolher "${chosenText.slice(0, 40)}...". ${expl ? `Explicação: ${expl}` : ''}`,
         type: 'event',
         timestamp: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
       });
     }
 
+    // Store active question answer state so all players see the result
+    const questionAnswer: ActiveQuestionAnswer = {
+      playerId: activePlayer.id,
+      playerName: activePlayer.name,
+      playerAvatar: activePlayer.avatar,
+      playerColor: activePlayer.color,
+      selectedOptionId: chosenId,
+      selectedOptionText: chosenText,
+      isCorrect: correct,
+      pointsEarned: correct ? points : 0,
+      explanation: expl,
+      legalBasis: basis,
+    };
+
+    room.activeQuestionAnswer = questionAnswer;
+
+    // Broadcast answer event and updated room to all players
+    io.to(roomId).emit('game:question_answered', questionAnswer);
     io.to(roomId).emit('room:updated', room);
   });
 
@@ -395,6 +455,10 @@ io.on('connection', (socket: Socket) => {
 
     const activePlayer = room.players[room.activePlayerIndex];
     if (!activePlayer) return;
+
+    // Security: Only active player can choose bonus action
+    const isAuthorized = activePlayer.socketId === socket.id || (currentPlayerId && activePlayer.id === currentPlayerId);
+    if (!isAuthorized) return;
 
     activePlayer.bonusCount = (activePlayer.bonusCount || 0) + 1;
     if (points) activePlayer.points += points;
@@ -447,9 +511,21 @@ io.on('connection', (socket: Socket) => {
     const room = rooms.get(roomId);
     if (!room) return;
 
+    const activePlayer = room.players[room.activePlayerIndex];
+    // Security: Only active player or room host can advance turn
+    const isAuthorized = !activePlayer ||
+      activePlayer.socketId === socket.id ||
+      (currentPlayerId && activePlayer.id === currentPlayerId) ||
+      socket.id === room.hostSocketId;
+    if (!isAuthorized) {
+      console.warn(`[Multiplayer Security] game:close_event rejected from unauthorized socket ${socket.id}`);
+      return;
+    }
+
     room.isEventModalOpen = false;
     room.currentEvent = null;
     room.currentEventTile = null;
+    room.activeQuestionAnswer = null;
 
     // Check if all players finished
     const allFinished = room.players.every((p) => p.isFinished);

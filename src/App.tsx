@@ -285,6 +285,46 @@ export default function App() {
   // ===========================================================================
   // EVENT RESOLUTION (LOCAL & ONLINE)
   // ===========================================================================
+  const handleSubmitOnlineAnswer = (optionId: string, optionText: string) => {
+    if (!onlineRoom || !currentEvent?.question) return;
+
+    const matchedOption = currentEvent.question.options.find(
+      (o) => o.id === optionId || o.text === optionId || o.text === optionText
+    );
+
+    const isCorrect = !!matchedOption?.isCorrect;
+    const pointsEarned = matchedOption ? currentEvent.question.pointsReward : 0;
+    const explanation = matchedOption?.explanation || currentEvent.question.options.find((o) => o.isCorrect)?.explanation || '';
+    const legalBasis = matchedOption?.legalBasis || currentEvent.legalContext || 'CLT/CF/88';
+
+    socket.emit('game:answer_question', {
+      roomId: onlineRoom.roomId,
+      optionId,
+      optionText,
+      isCorrect,
+      pointsEarned,
+      penalty: 0,
+      explanation,
+      legalBasis,
+    });
+  };
+
+  const handleContinueOnline = () => {
+    if (!onlineRoom) return;
+
+    if (activePlayer && (activePlayer.position || 1) >= FINISH_TILE_ID && !activePlayer.isFinished) {
+      const finishedCount = players.filter((p) => p.isFinished).length;
+      socket.emit('game:player_finished', {
+        roomId: onlineRoom.roomId,
+        rank: finishedCount + 1,
+        bonusPoints: 20,
+      });
+    }
+
+    socket.emit('game:close_event', { roomId: onlineRoom.roomId });
+    setIsEventModalOpen(false);
+  };
+
   const handleResolveEvent = (outcome: {
     pointsDelta: number;
     reputationDelta: number;
@@ -295,24 +335,11 @@ export default function App() {
     wasCorrect?: boolean;
     isQuestion?: boolean;
   }) => {
-    setIsEventModalOpen(false);
-
-    if (!activePlayer || !currentEventTile) return;
-
     if (gameMode === 'online' && onlineRoom) {
-      // Transmit to Online Server
       if (outcome.isQuestion) {
-        const selectedOption = currentEvent?.question?.options.find((o) => o.text === outcome.chosenText);
-        socket.emit('game:answer_question', {
-          roomId: onlineRoom.roomId,
-          optionId: outcome.chosenText,
-          isCorrect: !!outcome.wasCorrect,
-          pointsEarned: outcome.pointsDelta,
-          penalty: outcome.pointsDelta < 0 ? Math.abs(outcome.pointsDelta) : 0,
-          explanation: selectedOption?.explanation,
-          legalBasis: selectedOption?.legalBasis,
-        });
-      } else if (currentEventTile.isBonus) {
+        return;
+      }
+      if (currentEventTile?.isBonus) {
         socket.emit('game:bonus_action', {
           roomId: onlineRoom.roomId,
           bonusType: currentEventTile.category,
@@ -323,7 +350,6 @@ export default function App() {
         });
       }
 
-      // Check finish condition
       if ((activePlayer.position || 1) >= FINISH_TILE_ID && !activePlayer.isFinished) {
         const finishedCount = players.filter((p) => p.isFinished).length;
         socket.emit('game:player_finished', {
@@ -333,10 +359,14 @@ export default function App() {
         });
       }
 
-      // Close event and advance turn on server
       socket.emit('game:close_event', { roomId: onlineRoom.roomId });
+      setIsEventModalOpen(false);
       return;
     }
+
+    setIsEventModalOpen(false);
+
+    if (!activePlayer || !currentEventTile) return;
 
     // Local Mode State Resolution
     const isQuestion = !!outcome.isQuestion;
@@ -619,6 +649,12 @@ export default function App() {
           player={activePlayer}
           tile={currentEventTile}
           onResolve={handleResolveEvent}
+          isOnline={gameMode === 'online'}
+          isMyTurn={isMyTurn}
+          isHost={isHost}
+          activeQuestionAnswer={onlineRoom?.activeQuestionAnswer}
+          onSubmitOnlineAnswer={handleSubmitOnlineAnswer}
+          onContinueOnline={handleContinueOnline}
         />
       )}
 

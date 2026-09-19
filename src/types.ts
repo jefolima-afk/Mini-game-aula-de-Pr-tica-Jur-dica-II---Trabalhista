@@ -143,6 +143,19 @@ export interface ChatMessage {
   isSystem?: boolean;
 }
 
+export interface ActiveQuestionAnswer {
+  playerId: string;
+  playerName: string;
+  playerAvatar?: string;
+  playerColor?: string;
+  selectedOptionId: string;
+  selectedOptionText: string;
+  isCorrect: boolean;
+  pointsEarned: number;
+  explanation?: string;
+  legalBasis?: string;
+}
+
 export interface OnlineRoom {
   roomId: string;
   roomName: string;
@@ -156,6 +169,7 @@ export interface OnlineRoom {
   currentEvent: any | null;
   currentEventTile: any | null;
   isEventModalOpen: boolean;
+  activeQuestionAnswer?: ActiveQuestionAnswer | null;
   spinningNumber: number | null;
   ceremonyStep?: string;
   bottomRevealedCount?: number;
