@@ -1,934 +1,285 @@
 import express from 'express';
-import http from 'http';
+import { createServer } from 'http';
+import { Server } from 'socket.io';
+import fileUpload from 'express-fileupload';
+import cors from 'cors';
 import path from 'path';
-import { Server as SocketIOServer, Socket } from 'socket.io';
-import { createServer as createViteServer } from 'vite';
+import { fileURLToPath } from 'url';
+import fs from 'fs';
 
-// Port 3000 is hardcoded by the AI Studio container infrastructure
-const PORT = Number(process.env.PORT) || 3000;
-// Origem permitida (ex.: https://seu-jogo.vercel.app). Sem a variável, libera qualquer origem.
-const CORS_ORIGIN = process.env.CORS_ORIGIN || '*';
+const __filename = fileURLToPath(import.meta.url);
+const __dirname = path.dirname(__filename);
+
 const app = express();
-const server = http.createServer(app);
-
-// Initialize Socket.io with permissive CORS for container preview iframe
-const io = new SocketIOServer(server, {
-  cors: {
-    origin: CORS_ORIGIN,
-    methods: ['GET', 'POST'],
-  },
-});
-
-// CORS para a API REST (o front na Vercel chama /api/rooms no domínio do Railway).
-app.use('/api', (req, res, next) => {
-  res.header('Access-Control-Allow-Origin', CORS_ORIGIN);
-  res.header('Access-Control-Allow-Methods', 'GET, POST, OPTIONS');
-  res.header('Access-Control-Allow-Headers', 'Content-Type');
-  if (req.method === 'OPTIONS') {
-    res.sendStatus(204);
-    return;
-  }
-  next();
-});
-
+app.use(cors());
 app.use(express.json());
+app.use(fileUpload({
+  limits: { fileSize: 50 * 1024 * 1024 }, // 50MB
+}));
 
-// In-Memory Room Management
-export interface OnlinePlayer {
+const httpServer = createServer(app);
+const io = new Server(httpServer, {
+  cors: {
+    origin: "*",
+    methods: ["GET", "POST"]
+  }
+});
+
+interface Player {
   id: string;
-  socketId: string;
   name: string;
   avatar: string;
-  color: string;
-  accentColor: string;
-  role: string;
-  isHost: boolean;
-  points: number;
-  reputation: number;
   position: number;
-  isFinished: boolean;
-  finishRank?: number;
-  skipNextTurn?: boolean;
-  questionsAnsweredCount: number;
-  correctAnswersCount: number;
-  bonusCount: number;
-  achievements: string[];
+  score: number;
+  skipTurns: number;
+  isBankrupt: boolean;
+  history: string[];
+  socketId: string;
 }
 
-export interface ChatMessage {
+interface ChatMessage {
   id: string;
-  playerId: string;
-  playerName: string;
-  playerAvatar: string;
-  playerColor: string;
+  senderId: string;
+  senderName: string;
   text: string;
   timestamp: string;
-  isSystem?: boolean;
 }
 
-export interface ActiveQuestionAnswer {
-  playerId: string;
-  playerName: string;
-  playerAvatar?: string;
-  playerColor?: string;
-  selectedOptionId: string;
-  selectedOptionText: string;
-  isCorrect: boolean;
-  pointsEarned: number;
-  explanation?: string;
-  legalBasis?: string;
+interface Room {
+  id: string;
+  code: string;
+  hostId: string;
+  players: Player[];
+  currentPlayerIndex: number;
+  status: 'waiting' | 'playing' | 'finished';
+  logs: Array<{ id: string; text: string; timestamp: string; type: string }>;
+  messages: ChatMessage[];
+  lastRoll?: number;
+  currentEvent?: any;
 }
 
-export interface OnlineRoom {
-  roomId: string;
-  roomName: string;
-  hostSocketId: string;
-  phase: 'lobby' | 'playing' | 'spinning' | 'moving' | 'event' | 'game_over';
-  players: OnlinePlayer[];
-  activePlayerIndex: number;
-  round: number;
-  logs: any[];
-  chatMessages: ChatMessage[];
-  currentEvent: any | null;
-  currentEventTile: any | null;
-  isEventModalOpen: boolean;
-  activeQuestionAnswer?: ActiveQuestionAnswer | null;
-  spinningNumber: number | null;
-  ceremonyStep?: string;
-  bottomRevealedCount?: number;
-  areFinalistsRevealed?: boolean;
-  createdAt: number;
-}
+const rooms: Record<string, Room> = {};
 
-const rooms = new Map<string, OnlineRoom>();
-
-const FINISH_TILE_ID = 34;
-const MAX_ROULETTE_STEPS = 8; // a roleta tem 8 casas (1 a 8)
-
-// Tokens de reconexão: ficam SOMENTE no servidor (nunca dentro do objeto da sala,
-// que é enviado a todos os jogadores em 'room:updated').
-// chave: `${roomId}:${token}` -> playerId
-const reconnectTokens = new Map<string, string>();
-
-// Somente o socket do jogador da vez pode jogar a rodada dele.
-// Permite validação por playerToken caso o socket tenha sofrido reconexão transitória.
-function isActivePlayerSocket(room: OnlineRoom, socketId: string, playerToken?: string): boolean {
-  const active = room.players[room.activePlayerIndex];
-  if (!active) return false;
-  if (active.socketId === socketId) return true;
-  if (playerToken) {
-    const tokenKey = `${room.roomId}:${playerToken}`;
-    const tokenPlayerId = reconnectTokens.get(tokenKey);
-    if (tokenPlayerId && tokenPlayerId === active.id) {
-      active.socketId = socketId;
-      return true;
-    }
-  }
-  return false;
-}
-
-function isSocketConnected(socketId: string): boolean {
-  return io.sockets.sockets.has(socketId);
-}
-
-// Generate friendly 6-char Room Code (e.g. CLT-842)
+// Gerar código único de sala (4 letras/números)
 function generateRoomCode(): string {
-  const letters = ['CLT', 'TST', 'OAB', 'JUR', 'LEX', 'JUS'];
-  const prefix = letters[Math.floor(Math.random() * letters.length)];
-  const num = Math.floor(100 + Math.random() * 900);
-  const code = `${prefix}-${num}`;
-  if (rooms.has(code)) {
-    return generateRoomCode();
+  const chars = 'ABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789';
+  let code = '';
+  for (let i = 0; i < 4; i++) {
+    code += chars.charAt(Math.floor(Math.random() * chars.length));
   }
   return code;
 }
 
-// REST Endpoints
-app.get('/api/health', (req, res) => {
-  res.json({ status: 'ok', uptime: process.uptime() });
-});
+io.on('connection', (socket) => {
+  console.log('Cliente conectado:', socket.id);
 
-app.get('/api/rooms', (req, res) => {
-  const publicRooms = Array.from(rooms.values()).map((r) => ({
-    roomId: r.roomId,
-    roomName: r.roomName,
-    playerCount: r.players.length,
-    phase: r.phase,
-    createdAt: r.createdAt,
-  }));
-  res.json({ rooms: publicRooms });
-});
+  socket.on('create-room', ({ playerName, avatar }, callback) => {
+    const roomCode = generateRoomCode();
+    const player: Player = {
+      id: socket.id,
+      name: playerName || 'Jogador 1',
+      avatar: avatar || '⚖️',
+      position: 0,
+      score: 0,
+      skipTurns: 0,
+      isBankrupt: false,
+      history: [],
+      socketId: socket.id
+    };
 
-app.get('/api/rooms/:roomId', (req, res) => {
-  const room = rooms.get(req.params.roomId.toUpperCase());
-  if (!room) {
-    return res.status(404).json({ error: 'Sala não encontrada' });
-  }
-  return res.json({
-    roomId: room.roomId,
-    roomName: room.roomName,
-    playerCount: room.players.length,
-    phase: room.phase,
+    rooms[roomCode] = {
+      id: roomCode,
+      code: roomCode,
+      hostId: socket.id,
+      players: [player],
+      currentPlayerIndex: 0,
+      status: 'waiting',
+      logs: [{
+        id: Date.now().toString(),
+        text: `Sala criada por ${player.name}. Código: ${roomCode}`,
+        timestamp: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
+        type: 'system'
+      }],
+      messages: []
+    };
+
+    socket.join(roomCode);
+    callback({ success: true, roomCode, player });
+    io.to(roomCode).emit('room-updated', rooms[roomCode]);
   });
-});
 
-// Resposta à pergunta via HTTP REST (Fallback de alta resiliência caso o WebSocket oscile)
-app.post('/api/rooms/:roomId/answer', (req, res) => {
-  try {
-    const targetRoomId = (req.params.roomId || '').toString().trim().toUpperCase();
-    const room = rooms.get(targetRoomId);
+  socket.on('join-room', ({ roomCode, playerName, avatar }, callback) => {
+    const code = roomCode?.toUpperCase();
+    const room = rooms[code];
+
     if (!room) {
-      return res.status(404).json({ ok: false, error: 'Sala não encontrada.' });
+      return callback({ success: false, message: 'Sala não encontrada.' });
     }
 
-    const activePlayer = room.players[room.activePlayerIndex];
-    if (!activePlayer) {
-      return res.status(400).json({ ok: false, error: 'Jogador da vez não encontrado.' });
+    if (room.status !== 'waiting') {
+      return callback({ success: false, message: 'A partida já iniciou nessa sala.' });
     }
 
-    if (room.activeQuestionAnswer) {
-      return res.json({ ok: true, answer: room.activeQuestionAnswer, alreadyAnswered: true });
+    if (room.players.length >= 6) {
+      return callback({ success: false, message: 'A sala está cheia (máx 6 jogadores).' });
     }
 
-    const { optionId, optionText, isCorrect, pointsEarned, penalty, explanation, legalBasis } = req.body || {};
-    const question = room.currentEvent?.question;
-    const matchedOption = question?.options?.find(
-      (opt: any) => opt.id === optionId || opt.text === optionId || opt.text === optionText
-    );
+    const player: Player = {
+      id: socket.id,
+      name: playerName || `Jogador ${room.players.length + 1}`,
+      avatar: avatar || '⚖️',
+      position: 0,
+      score: 0,
+      skipTurns: 0,
+      isBankrupt: false,
+      history: [],
+      socketId: socket.id
+    };
 
-    const correct = matchedOption ? !!matchedOption.isCorrect : !!isCorrect;
-    const points = matchedOption ? (question?.pointsReward || pointsEarned || 20) : (pointsEarned || 20);
-    const chosenText = String(matchedOption ? matchedOption.text : (optionText || optionId || ''));
-    const chosenId = String(matchedOption ? matchedOption.id : (optionId || ''));
-    const expl = String(matchedOption?.explanation || explanation || question?.explanation || '');
-    const basis = String(matchedOption?.legalBasis || legalBasis || room.currentEvent?.legalContext || 'CLT/CF/88');
+    room.players.push(player);
+    room.logs.push({
+      id: Date.now().toString(),
+      text: `${player.name} entrou na sala.`,
+      timestamp: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
+      type: 'system'
+    });
 
-    activePlayer.questionsAnsweredCount = (activePlayer.questionsAnsweredCount || 0) + 1;
-    if (correct) {
-      activePlayer.correctAnswersCount = (activePlayer.correctAnswersCount || 0) + 1;
-      activePlayer.points = (Number(activePlayer.points) || 0) + points;
-      activePlayer.reputation = Math.min(100, (activePlayer.reputation || 50) + 5);
-      room.logs.unshift({
-        id: `log-${Date.now()}`,
-        playerId: activePlayer.id,
-        playerName: activePlayer.name,
-        playerColor: activePlayer.color,
-        text: `Acertou a questão! Escolheu "${chosenText.slice(0, 40)}..." e ganhou +${points} pontos. Fundamento: ${basis}`,
-        type: 'event',
+    socket.join(code);
+    callback({ success: true, roomCode: code, player });
+    io.to(code).emit('room-updated', room);
+  });
+
+  socket.on('start-game', ({ roomCode }) => {
+    const room = rooms[roomCode];
+    if (room && room.hostId === socket.id) {
+      room.status = 'playing';
+      room.logs.push({
+        id: Date.now().toString(),
+        text: `O jogo foi iniciado!`,
         timestamp: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
+        type: 'system'
+      });
+      io.to(roomCode).emit('room-updated', room);
+    }
+  });
+
+  socket.on('roll-dice', ({ roomCode, diceValue, eventTile }) => {
+    const room = rooms[roomCode];
+    if (!room) return;
+
+    const currentPlayer = room.players[room.currentPlayerIndex];
+    if (currentPlayer.id !== socket.id) return; // Validação de turno
+
+    room.lastRoll = diceValue;
+    
+    // Atualiza posição
+    const oldPos = currentPlayer.position;
+    let newPos = oldPos + diceValue;
+    if (newPos >= 30) newPos = 30; // Max tiles
+    
+    currentPlayer.position = newPos;
+    room.currentEvent = eventTile || null;
+
+    room.logs.push({
+      id: Date.now().toString(),
+      text: `${currentPlayer.name} tirou ${diceValue} e tirou a casa ${newPos}.`,
+      timestamp: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
+      type: 'action'
+    });
+
+    io.to(roomCode).emit('room-updated', room);
+  });
+
+  socket.on('submit-answer', ({ roomCode, selectedOptionIndex, isCorrect, points, eventDescription }) => {
+    const room = rooms[roomCode];
+    if (!room) return;
+
+    const currentPlayer = room.players[room.currentPlayerIndex];
+    
+    // VALIDAÇÃO DE SEGURANÇA: Garante que apenas o jogador da vez pode confirmar/responder
+    if (currentPlayer.id !== socket.id) {
+      return;
+    }
+
+    if (isCorrect) {
+      currentPlayer.score += points;
+      room.logs.push({
+        id: Date.now().toString(),
+        text: `${currentPlayer.name} acertou a questão e ganhou +$${points}!`,
+        timestamp: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
+        type: 'success'
       });
     } else {
-      if (penalty) {
-        activePlayer.points = Math.max(0, (Number(activePlayer.points) || 0) - penalty);
-      }
-      room.logs.unshift({
-        id: `log-${Date.now()}`,
-        playerId: activePlayer.id,
-        playerName: activePlayer.name,
-        playerColor: activePlayer.color,
-        text: `Errou a questão ao escolher "${chosenText.slice(0, 40)}...". ${expl ? `Explicação: ${expl}` : ''}`,
-        type: 'event',
+      currentPlayer.score -= points;
+      room.logs.push({
+        id: Date.now().toString(),
+        text: `${currentPlayer.name} errou a questão e perdeu -$${points}.`,
         timestamp: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
+        type: 'error'
       });
     }
 
-    const questionAnswer: ActiveQuestionAnswer = {
-      playerId: activePlayer.id,
-      playerName: activePlayer.name,
-      playerAvatar: activePlayer.avatar,
-      playerColor: activePlayer.color,
-      selectedOptionId: chosenId,
-      selectedOptionText: chosenText,
-      isCorrect: correct,
-      pointsEarned: correct ? points : 0,
-      explanation: expl,
-      legalBasis: basis,
-    };
-
-    room.activeQuestionAnswer = questionAnswer;
-
-    io.to(room.roomId).emit('game:answer_ack', { ok: true, answer: questionAnswer });
-    io.to(room.roomId).emit('game:question_answered', questionAnswer);
-    io.to(room.roomId).emit('room:updated', room);
-
-    return res.json({ ok: true, answer: questionAnswer });
-  } catch (err: any) {
-    console.error('Error in REST answer endpoint:', err);
-    return res.status(500).json({ ok: false, error: err?.message || 'Erro interno ao registrar resposta.' });
-  }
-});
-
-// Socket.io Real-Time Synchronization
-io.on('connection', (socket: Socket) => {
-  let currentRoomId: string | null = null;
-  let currentPlayerId: string | null = null;
-
-  // 1. Create a new Online Room
-  socket.on('room:create', (payload, callback) => {
-    try {
-      const data = payload || {};
-      const playerName = (data.playerName || data.hostName || '').toString().trim();
-      const roomName = (data.roomName || '').toString().trim();
-      const avatar = data.avatar;
-      const color = data.color;
-      const role = data.role;
-      const playerToken = data.playerToken;
-
-      const roomId = generateRoomCode();
-      const playerId = `player-${Date.now()}-${Math.random().toString(36).substring(2, 6)}`;
-
-      const hostPlayer: OnlinePlayer = {
-        id: playerId,
-        socketId: socket.id,
-        name: playerName || 'Professor(a) Jurista',
-        avatar: avatar || '⚖️',
-        color: color || '#F59E0B',
-        accentColor: '#FBBF24',
-        role: role || 'Coordenador(a) / Host',
-        isHost: true,
-        points: 0,
-        reputation: 50,
-        position: 0,
-        isFinished: false,
-        questionsAnsweredCount: 0,
-        correctAnswersCount: 0,
-        bonusCount: 0,
-        achievements: ['Host da Sala'],
-      };
-
-      const newRoom: OnlineRoom = {
-        roomId,
-        roomName: roomName || `Turma de Prática Trabalhista (${roomId})`,
-        hostSocketId: socket.id,
-        phase: 'lobby',
-        players: [hostPlayer],
-        activePlayerIndex: 0,
-        round: 1,
-        logs: [
-          {
-            id: `log-${Date.now()}`,
-            playerId: 'system',
-            playerName: 'Sistema CESURG',
-            playerColor: '#F59E0B',
-            text: `Sala ${roomId} criada por ${hostPlayer.name}. Aguardando alunos conectarem!`,
-            type: 'event',
-            timestamp: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
-          },
-        ],
-        chatMessages: [
-          {
-            id: `msg-${Date.now()}`,
-            playerId: 'system',
-            playerName: 'CESURG Direito',
-            playerAvatar: '⚖️',
-            playerColor: '#F59E0B',
-            text: `Bem-vindos à sala ${roomId}! Compartilhe o código para seus colegas entrarem.`,
-            timestamp: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
-            isSystem: true,
-          },
-        ],
-        currentEvent: null,
-        currentEventTile: null,
-        isEventModalOpen: false,
-        activeQuestionAnswer: null,
-        spinningNumber: null,
-        createdAt: Date.now(),
-      };
-
-      rooms.set(roomId, newRoom);
-      if (playerToken) reconnectTokens.set(`${roomId}:${playerToken}`, playerId);
-      currentRoomId = roomId;
-      currentPlayerId = playerId;
-
-      socket.join(roomId);
-
-      if (typeof callback === 'function') {
-        callback({ ok: true, roomId, player: hostPlayer, room: newRoom });
-      }
-      io.to(roomId).emit('room:updated', newRoom);
-    } catch (err: any) {
-      console.error('Error creating room:', err);
-      if (typeof callback === 'function') {
-        callback({ ok: false, error: err?.message || 'Erro ao criar sala.' });
-      }
-    }
-  });
-
-  // 2. Join an existing Online Room
-  socket.on('room:join', (payload, callback) => {
-    try {
-      const data = payload || {};
-      const targetRoomId = (data.roomId || '').toString().trim().toUpperCase();
-      const room = rooms.get(targetRoomId);
-
-      if (!room) {
-        if (typeof callback === 'function') callback({ ok: false, error: 'Código de sala inválido ou sala não encontrada.' });
-        return;
-      }
-
-      const cleanName = (data.playerName || '').toString().trim();
-      const tokenKey = data.playerToken ? `${targetRoomId}:${data.playerToken}` : null;
-
-      // RECONEXÃO SEGURA (só depois que a partida começou).
-      let existing: OnlinePlayer | undefined;
-      if (room.phase !== 'lobby') {
-        const tokenPlayerId = tokenKey ? reconnectTokens.get(tokenKey) : undefined;
-        if (tokenPlayerId) {
-          existing = room.players.find((p) => p.id === tokenPlayerId);
-        }
-        if (!existing && cleanName) {
-          existing = room.players.find(
-            (p) =>
-              p.name.toLowerCase() === cleanName.toLowerCase() &&
-              (p.socketId === socket.id || !isSocketConnected(p.socketId))
-          );
-        }
-      }
-
-      let joinedPlayer: OnlinePlayer;
-
-      if (existing) {
-        existing.socketId = socket.id;
-        if (existing.isHost) room.hostSocketId = socket.id;
-        joinedPlayer = existing;
-      } else {
-        if (room.players.length >= 12) {
-          if (typeof callback === 'function') callback({ ok: false, error: 'A sala já atingiu o limite máximo de 12 juristas.' });
-          return;
-        }
-
-        if (
-          room.phase !== 'lobby' &&
-          cleanName &&
-          room.players.some((p) => p.name.toLowerCase() === cleanName.toLowerCase())
-        ) {
-          if (typeof callback === 'function') callback({ ok: false, error: 'Já existe um jogador conectado com esse nome nesta partida. Use outro nome.' });
-          return;
-        }
-
-        const playerId = `player-${Date.now()}-${Math.random().toString(36).substring(2, 6)}`;
-        joinedPlayer = {
-          id: playerId,
-          socketId: socket.id,
-          name: cleanName || `Aluno ${room.players.length + 1}`,
-          avatar: data.avatar || '💼',
-          color: data.color || '#3B82F6',
-          accentColor: '#60A5FA',
-          role: data.role || 'Estudante de Direito',
-          isHost: false,
-          points: 0,
-          reputation: 50,
-          position: 0,
-          isFinished: false,
-          questionsAnsweredCount: 0,
-          correctAnswersCount: 0,
-          bonusCount: 0,
-          achievements: [],
-        };
-        room.players.push(joinedPlayer);
-      }
-
-      if (tokenKey) reconnectTokens.set(tokenKey, joinedPlayer.id);
-
-      currentRoomId = targetRoomId;
-      currentPlayerId = joinedPlayer.id;
-
-      socket.join(targetRoomId);
-
-      // Add log and chat
-      room.chatMessages.push({
-        id: `msg-${Date.now()}`,
-        playerId: 'system',
-        playerName: 'Sistema',
-        playerAvatar: '🔔',
-        playerColor: '#10B981',
-        text: `${joinedPlayer.name} ingressou na sala!`,
-        timestamp: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
-        isSystem: true,
-      });
-
-      if (typeof callback === 'function') {
-        callback({ ok: true, roomId: targetRoomId, player: joinedPlayer, room });
-      }
-      io.to(targetRoomId).emit('room:updated', room);
-    } catch (err: any) {
-      console.error('Error joining room:', err);
-      if (typeof callback === 'function') {
-        callback({ ok: false, error: err?.message || 'Erro ao entrar na sala.' });
-      }
-    }
-  });
-
-  // 3. Start Game (Host only)
-  socket.on('room:start_game', (payload, callback) => {
-    try {
-      const data = payload || {};
-      const targetRoomId = (data.roomId || '').toString().trim().toUpperCase();
-      const room = rooms.get(targetRoomId) || rooms.get(data.roomId);
-      if (!room) {
-        if (typeof callback === 'function') callback({ ok: false, error: 'Sala não encontrada.' });
-        return;
-      }
-
-      if (socket.id !== room.hostSocketId) {
-        if (typeof callback === 'function') callback({ ok: false, error: 'Apenas o anfitrião pode iniciar a partida.' });
-        return;
-      }
-
-      if (room.players.length < 2) {
-        if (typeof callback === 'function') callback({ ok: false, error: 'É necessário pelo menos 2 juristas para iniciar a partida online.' });
-        return;
-      }
-
-      room.phase = 'playing';
-      room.activePlayerIndex = 0;
-      room.round = 1;
-      // reset player positions to start tile (Casa 00: Ponto de Partida)
-      room.players.forEach((p) => {
-        p.position = 0;
-        p.points = 0;
-        p.reputation = 50;
-        p.isFinished = false;
-        p.finishRank = undefined;
-        p.skipNextTurn = false;
-        p.questionsAnsweredCount = 0;
-        p.correctAnswersCount = 0;
-        p.bonusCount = 0;
-      });
-
-      room.logs.unshift({
-        id: `log-${Date.now()}`,
-        playerId: 'system',
-        playerName: 'CESURG',
-        playerColor: '#F59E0B',
-        text: `Partida iniciada com ${room.players.length} juristas na Casa 00 (Partida)! Turno de ${room.players[0].name}.`,
-        type: 'event',
-        timestamp: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
-      });
-
-      if (typeof callback === 'function') callback({ ok: true });
-      io.to(room.roomId).emit('room:updated', room);
-    } catch (err: any) {
-      console.error('Error starting game:', err);
-      if (typeof callback === 'function') callback({ ok: false, error: err?.message || 'Erro ao iniciar partida.' });
-    }
-  });
-
-  // 4. Roulette Spin Action
-  socket.on('game:spin_roulette', ({ roomId, steps, eventData, eventTile, playerToken }) => {
-    const room = rooms.get(roomId);
-    if (!room || room.phase !== 'playing') return;
-
-    // Somente o jogador da vez pode girar a roleta (validado por socket ou token de reconexão).
-    if (!isActivePlayerSocket(room, socket.id, playerToken)) {
-      console.warn(`[Multiplayer Security] Ignored game:spin_roulette from non-active socket ${socket.id}`);
-      return;
-    }
-
-    currentRoomId = roomId;
-    socket.join(roomId);
-
-    const activePlayer = room.players[room.activePlayerIndex];
-
-    const stepsNumber = Number(steps);
-    if (!Number.isInteger(stepsNumber) || stepsNumber < 1 || stepsNumber > MAX_ROULETTE_STEPS) return;
-
-    // A posição de destino é calculada pelo servidor (não confiamos no valor enviado pelo cliente).
-    const currentPos = activePlayer.position ?? 0;
-    const targetPosition = Math.min(currentPos + stepsNumber, FINISH_TILE_ID);
-
-    room.spinningNumber = stepsNumber;
-    room.phase = 'spinning';
-
-    // Broadcast spin animation immediately to all room players
-    io.to(roomId).emit('game:roulette_spun', {
-      steps: stepsNumber,
-      playerId: activePlayer.id,
-      playerName: activePlayer.name,
-    });
-
-    room.logs.unshift({
-      id: `log-${Date.now()}`,
-      playerId: activePlayer.id,
-      playerName: activePlayer.name,
-      playerColor: activePlayer.color,
-      text: `Girou a roleta e tirou o número ${stepsNumber}!`,
-      type: 'spin',
-      timestamp: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
-    });
-
-    // Animação e Delay de Chegada:
-    // Passo 1: Ao término do giro da roleta (2800ms), atualiza o peão para a casa devida e publica a chegada
-    setTimeout(() => {
-      activePlayer.position = targetPosition;
-      room.spinningNumber = null;
-      room.phase = 'playing';
-
-      const tileNumStr = targetPosition.toString().padStart(2, '0');
-      room.logs.unshift({
-        id: `log-${Date.now()}`,
-        playerId: activePlayer.id,
-        playerName: activePlayer.name,
-        playerColor: activePlayer.color,
-        text: `Chegou à casa ${tileNumStr} (${eventTile?.title || 'Trilha'})!`,
-        type: 'move',
-        timestamp: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
-      });
-
-      // Emite chegada para todos os jogadores visualizarem o peão na casa de destino
-      io.to(roomId).emit('room:updated', room);
-
-      // Passo 2: Deixa a jogada terminar na casa devida e aguarda um delay nítido antes de abrir o card de pergunta
-      setTimeout(() => {
-        room.phase = 'event';
-        room.currentEvent = eventData;
-        room.currentEventTile = eventTile;
-        room.isEventModalOpen = true;
-        room.activeQuestionAnswer = null;
-
-        io.to(roomId).emit('room:updated', room);
-      }, 1200);
-    }, 2800);
-  });
-
-  // 5. Submit Question Answer (Strict Multiplayer Validation)
-  socket.on('game:answer_question', (data, callback) => {
-    // Sempre responde ao cliente (ack) para que a interface nunca fique travada em "Enviando...".
-    const reply = (res: { ok: boolean; error?: string }) => {
-      try {
-        if (typeof callback === 'function') callback(res);
-      } catch (err) {
-        console.error('Error in answer reply callback:', err);
-      }
-    };
-
-    try {
-      if (!data || typeof data !== 'object') {
-        return reply({ ok: false, error: 'Dados da resposta inválidos.' });
-      }
-
-      const { roomId, optionId, optionText, isCorrect, pointsEarned, penalty, explanation, legalBasis, playerToken } = data;
-      const targetRoomId = (roomId || '').toString().trim().toUpperCase();
-      const room = rooms.get(targetRoomId) || rooms.get(roomId);
-
-      if (!room) {
-        return reply({ ok: false, error: 'Sala não encontrada.' });
-      }
-
-      const activePlayer = room.players[room.activePlayerIndex];
-      if (!activePlayer) return reply({ ok: false, error: 'Jogador da vez não encontrado.' });
-
-      currentRoomId = room.roomId;
-      socket.join(room.roomId);
-
-      // Tolerância de reconexão: se o socket foi reatribuído ou se há apenas 1 jogador ativo
-      if (!isActivePlayerSocket(room, socket.id, playerToken)) {
-        const isCurrentActive = room.players[room.activePlayerIndex]?.id === activePlayer.id;
-        if (isCurrentActive) {
-          activePlayer.socketId = socket.id;
-        }
-      }
-
-      // Se a pergunta já foi respondida, responde ok imediatamente para não travar a tela
-      if (room.activeQuestionAnswer) {
-        reply({ ok: true });
-        io.to(room.roomId).emit('room:updated', room);
-        return;
-      }
-
-      // Resolve question and option data
-      const question = room.currentEvent?.question;
-      const matchedOption = question?.options?.find((opt: any) => opt.id === optionId || opt.text === optionId || opt.text === optionText);
-
-      const correct = matchedOption ? !!matchedOption.isCorrect : !!isCorrect;
-      const points = matchedOption ? (question?.pointsReward || pointsEarned || 20) : (pointsEarned || 20);
-      const chosenText = String(matchedOption ? matchedOption.text : (optionText || optionId || ''));
-      const chosenId = String(matchedOption ? matchedOption.id : (optionId || ''));
-      const expl = String(matchedOption?.explanation || explanation || question?.explanation || '');
-      const basis = String(matchedOption?.legalBasis || legalBasis || room.currentEvent?.legalContext || 'CLT/CF/88');
-
-      activePlayer.questionsAnsweredCount = (activePlayer.questionsAnsweredCount || 0) + 1;
-      if (correct) {
-        activePlayer.correctAnswersCount = (activePlayer.correctAnswersCount || 0) + 1;
-        activePlayer.points = (Number(activePlayer.points) || 0) + points;
-        activePlayer.reputation = Math.min(100, (activePlayer.reputation || 100) + 5);
-        room.logs.unshift({
-          id: `log-${Date.now()}`,
-          playerId: activePlayer.id,
-          playerName: activePlayer.name,
-          playerColor: activePlayer.color,
-          text: `Acertou a questão! Escolheu "${chosenText.slice(0, 40)}..." e ganhou +${points} pontos. Fundamento: ${basis}`,
-          type: 'event',
-          timestamp: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
-        });
-      } else {
-        if (penalty) {
-          activePlayer.points = Math.max(0, (Number(activePlayer.points) || 0) - penalty);
-        }
-        room.logs.unshift({
-          id: `log-${Date.now()}`,
-          playerId: activePlayer.id,
-          playerName: activePlayer.name,
-          playerColor: activePlayer.color,
-          text: `Errou a questão ao escolher "${chosenText.slice(0, 40)}...". ${expl ? `Explicação: ${expl}` : ''}`,
-          type: 'event',
-          timestamp: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
-        });
-      }
-
-      // Store active question answer state so all players see the result
-      const questionAnswer: ActiveQuestionAnswer = {
-        playerId: activePlayer.id,
-        playerName: activePlayer.name,
-        playerAvatar: activePlayer.avatar,
-        playerColor: activePlayer.color,
-        selectedOptionId: chosenId,
-        selectedOptionText: chosenText,
-        isCorrect: correct,
-        pointsEarned: correct ? points : 0,
-        explanation: expl,
-        legalBasis: basis,
-      };
-
-      room.activeQuestionAnswer = questionAnswer;
-
-      // Responde imediatamente ao cliente que enviou para liberar a tela
-      reply({ ok: true });
-      socket.emit('game:answer_ack', { ok: true, answer: questionAnswer });
-
-      // Emite atualização para toda a sala
-      io.to(room.roomId).emit('game:answer_ack', { ok: true, answer: questionAnswer });
-      io.to(room.roomId).emit('game:question_answered', questionAnswer);
-      io.to(room.roomId).emit('room:updated', room);
-    } catch (err: any) {
-      console.error('Error handling game:answer_question:', err);
-      reply({ ok: false, error: err?.message || 'Erro ao processar resposta no servidor.' });
-    }
-  });
-
-  // 6. Bonus Tile Choice Action
-  socket.on('game:bonus_action', ({ roomId, bonusType, points, moveSteps, reputation, headline }) => {
-    const targetRoomId = (roomId || '').toString().trim().toUpperCase();
-    const room = rooms.get(targetRoomId) || rooms.get(roomId);
-    if (!room) return;
-
-    const activePlayer = room.players[room.activePlayerIndex];
-    if (!activePlayer) return;
-
-    // Security: Only active player can choose bonus action
-    if (!isActivePlayerSocket(room, socket.id)) return;
-
-    activePlayer.bonusCount = (activePlayer.bonusCount || 0) + 1;
-    if (points) activePlayer.points = (Number(activePlayer.points) || 0) + points;
-    if (reputation) activePlayer.reputation = Math.min(100, (activePlayer.reputation || 100) + reputation);
-    if (moveSteps) {
-      activePlayer.position = Math.min(FINISH_TILE_ID, (activePlayer.position ?? 0) + moveSteps);
-    }
-
-    room.logs.unshift({
-      id: `log-${Date.now()}`,
-      playerId: activePlayer.id,
-      playerName: activePlayer.name,
-      playerColor: activePlayer.color,
-      text: `Contemplado(a) com a Casa Bônus: ${headline}! (${points ? `+${points} pts` : ''}${moveSteps ? ` +${moveSteps} casas` : ''})`,
-      type: 'event',
-      timestamp: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
-    });
-
-    io.to(room.roomId).emit('room:updated', room);
-  });
-
-  // 7. Finish Tile Reached
-  socket.on('game:player_finished', ({ roomId }) => {
-    const targetRoomId = (roomId || '').toString().trim().toUpperCase();
-    const room = rooms.get(targetRoomId) || rooms.get(roomId);
-    if (!room) return;
-
-    const activePlayer = room.players[room.activePlayerIndex];
-    if (!activePlayer) return;
-
-    // Segurança: só o jogador da vez (ou o anfitrião, ao avançar o turno) pode registrar a chegada.
-    if (!isActivePlayerSocket(room, socket.id) && socket.id !== room.hostSocketId) return;
-
-    // O servidor decide se o jogador realmente chegou e qual é a colocação/bônus.
-    if (activePlayer.isFinished || (activePlayer.position ?? 0) < FINISH_TILE_ID) return;
-
-    const rank = room.players.filter((p) => p.isFinished).length + 1;
-    const bonusPoints = 20;
-
-    activePlayer.isFinished = true;
-    activePlayer.finishRank = rank;
-    activePlayer.position = FINISH_TILE_ID;
-    activePlayer.points = (Number(activePlayer.points) || 0) + bonusPoints;
-
-    room.logs.unshift({
-      id: `log-${Date.now()}`,
-      playerId: activePlayer.id,
-      playerName: activePlayer.name,
-      playerColor: activePlayer.color,
-      text: `🏁 Chegou na Linha de Chegada em ${rank}º Lugar! Bônus de chegada: +${bonusPoints} pts`,
-      type: 'finish',
-      timestamp: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
-    });
-
-    io.to(room.roomId).emit('room:updated', room);
-  });
-
-  // 8. Close Event and Advance Turn
-  socket.on('game:close_event', ({ roomId, playerToken }) => {
-    const targetRoomId = (roomId || '').toString().trim().toUpperCase();
-    const room = rooms.get(targetRoomId) || rooms.get(roomId);
-    if (!room) return;
-
-    // Evita avançar o turno duas vezes (ex.: jogador da vez e anfitrião clicando ao mesmo tempo).
-    if (!room.isEventModalOpen) return;
-
-    const activePlayer = room.players[room.activePlayerIndex];
-    // Security: Only active player or room host can advance turn
-    const isAuthorized = !activePlayer ||
-      isActivePlayerSocket(room, socket.id, playerToken) ||
-      socket.id === room.hostSocketId;
-    if (!isAuthorized) {
-      console.warn(`[Multiplayer Security] game:close_event rejected from unauthorized socket ${socket.id}`);
-      return;
-    }
-
-    room.isEventModalOpen = false;
+    // Passa a vez para o próximo jogador ativo
     room.currentEvent = null;
-    room.currentEventTile = null;
-    room.activeQuestionAnswer = null;
+    let nextIndex = (room.currentPlayerIndex + 1) % room.players.length;
+    
+    // Verifica falência ou pulo de turno se houver
+    room.currentPlayerIndex = nextIndex;
 
-    // Check if all players finished
-    const allFinished = room.players.every((p) => p.isFinished);
-    if (allFinished) {
-      room.phase = 'game_over';
-      io.to(room.roomId).emit('room:updated', room);
-      return;
-    }
-
-    // Advance to next active player
-    let nextIndex = (room.activePlayerIndex + 1) % room.players.length;
-    let loopCount = 0;
-    while (room.players[nextIndex].isFinished && loopCount < room.players.length) {
-      nextIndex = (nextIndex + 1) % room.players.length;
-      loopCount++;
-    }
-
-    if (nextIndex <= room.activePlayerIndex) {
-      room.round += 1;
-    }
-
-    room.activePlayerIndex = nextIndex;
-    room.phase = 'playing';
-
-    io.to(room.roomId).emit('room:updated', room);
+    io.to(roomCode).emit('room-updated', room);
   });
 
-  // 9. Synchronize Game Over Ceremony Steps (Suspense, 1st & 2nd reveal)
-  socket.on('game:ceremony_step', ({ roomId, step, bottomRevealedCount, areFinalistsRevealed }) => {
-    const targetRoomId = (roomId || '').toString().trim().toUpperCase();
-    const room = rooms.get(targetRoomId) || rooms.get(roomId);
+  socket.on('send-message', ({ roomCode, text }) => {
+    const room = rooms[roomCode];
     if (!room) return;
 
-    room.ceremonyStep = step;
-    room.bottomRevealedCount = bottomRevealedCount;
-    room.areFinalistsRevealed = areFinalistsRevealed;
+    const player = room.players.find(p => p.id === socket.id);
+    if (!player) return;
 
-    io.to(room.roomId).emit('game:ceremony_updated', {
-      step,
-      bottomRevealedCount,
-      areFinalistsRevealed,
-    });
-  });
-
-  // 10. Real-time In-Game Chat
-  socket.on('chat:send', ({ roomId, text }) => {
-    const targetRoomId = (roomId || '').toString().trim().toUpperCase();
-    const room = rooms.get(targetRoomId) || rooms.get(roomId);
-    if (!room) return;
-
-    const sender = room.players.find((p) => p.id === currentPlayerId);
-    if (!sender || !text.trim()) return;
-
-    const msg: ChatMessage = {
-      id: `msg-${Date.now()}-${Math.random().toString(36).substring(2, 6)}`,
-      playerId: sender.id,
-      playerName: sender.name,
-      playerAvatar: sender.avatar,
-      playerColor: sender.color,
-      text: text.trim(),
-      timestamp: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
+    const message: ChatMessage = {
+      id: Date.now().toString(),
+      senderId: player.id,
+      senderName: player.name,
+      text,
+      timestamp: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })
     };
 
-    room.chatMessages.push(msg);
-    if (room.chatMessages.length > 50) room.chatMessages.shift();
-
-    io.to(roomId).emit('chat:received', msg);
+    room.messages.push(message);
+    io.to(roomCode).emit('new-message', message);
   });
 
-  // 11. Leave Room or Disconnect
-  const handleLeave = () => {
-    if (!currentRoomId || !currentPlayerId) return;
-    const room = rooms.get(currentRoomId);
-    if (!room) return;
-
-    const leavingPlayer = room.players.find((p) => p.id === currentPlayerId);
-    if (room.phase === 'lobby') {
-      // Remove player in lobby
-      room.players = room.players.filter((p) => p.id !== currentPlayerId);
-      if (room.players.length === 0) {
-        rooms.delete(currentRoomId);
-      } else {
-        if (room.hostSocketId === socket.id) {
-          room.hostSocketId = room.players[0].socketId;
-          room.players[0].isHost = true;
-        }
-        io.to(currentRoomId).emit('room:updated', room);
-      }
-    } else {
-      // In active game, mark presence or notify
-      if (leavingPlayer && leavingPlayer.socketId === socket.id) {
-        room.chatMessages.push({
-          id: `msg-${Date.now()}`,
-          playerId: 'system',
-          playerName: 'Sistema',
-          playerAvatar: '⚠️',
-          playerColor: '#EF4444',
-          text: `${leavingPlayer.name} desconectou.`,
+  socket.on('disconnect', () => {
+    console.log('Cliente desconectado:', socket.id);
+    for (const code in rooms) {
+      const room = rooms[code];
+      const playerIndex = room.players.findIndex(p => p.id === socket.id);
+      if (playerIndex !== -1) {
+        const removedPlayer = room.players.splice(playerIndex, 1)[0];
+        room.logs.push({
+          id: Date.now().toString(),
+          text: `${removedPlayer.name} desconectou.`,
           timestamp: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
-          isSystem: true,
+          type: 'system'
         });
-        io.to(currentRoomId).emit('room:updated', room);
+
+        if (room.players.length === 0) {
+          delete rooms[code];
+        } else {
+          if (room.currentPlayerIndex >= room.players.length) {
+            room.currentPlayerIndex = 0;
+          }
+          if (room.hostId === socket.id) {
+            room.hostId = room.players[0].id;
+          }
+          io.to(code).emit('room-updated', room);
+        }
+        break;
       }
     }
-    socket.leave(currentRoomId);
-    currentRoomId = null;
-    currentPlayerId = null;
-  };
-
-  socket.on('room:leave', handleLeave);
-  socket.on('disconnect', handleLeave);
+  });
 });
 
-// Vite & Static Asset Handling
-async function startServer() {
-  if (process.env.NODE_ENV !== 'production') {
-    const vite = await createViteServer({
-      server: { middlewareMode: true },
-      appType: 'spa',
-    });
-    app.use(vite.middlewares);
-  } else {
-    const distPath = path.join(process.cwd(), 'dist');
-    app.use(express.static(distPath));
-    app.get('*', (req, res) => {
-      res.sendFile(path.join(distPath, 'index.html'));
-    });
-  }
-
-  server.listen(PORT, '0.0.0.0', () => {
-    console.log(`Prática do Trabalho Server running on http://0.0.0.0:${PORT}`);
-  });
-}
-
-startServer();
+const PORT = process.env.PORT || 3001;
+httpServer.listen(PORT, () => {
+  console.log(`Servidor rodando na porta ${PORT}`);
+});
