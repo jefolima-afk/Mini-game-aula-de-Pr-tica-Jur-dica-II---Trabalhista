@@ -87,6 +87,24 @@ export interface OnlineRoom {
 
 const rooms = new Map<string, OnlineRoom>();
 
+const FINISH_TILE_ID = 35;
+const MAX_ROULETTE_STEPS = 8; // a roleta tem 8 casas (1 a 8)
+
+// Tokens de reconexão: ficam SOMENTE no servidor (nunca dentro do objeto da sala,
+// que é enviado a todos os jogadores em 'room:updated').
+// chave: `${roomId}:${token}` -> playerId
+const reconnectTokens = new Map<string, string>();
+
+// Somente o socket do jogador da vez pode jogar a rodada dele.
+function isActivePlayerSocket(room: OnlineRoom, socketId: string): boolean {
+  const active = room.players[room.activePlayerIndex];
+  return !!active && active.socketId === socketId;
+}
+
+function isSocketConnected(socketId: string): boolean {
+  return io.sockets.sockets.has(socketId);
+}
+
 // Generate friendly 6-char Room Code (e.g. CLT-842)
 function generateRoomCode(): string {
   const letters = ['CLT', 'TST', 'OAB', 'JUR', 'LEX', 'JUS'];
@@ -134,7 +152,7 @@ io.on('connection', (socket: Socket) => {
   let currentPlayerId: string | null = null;
 
   // 1. Create a new Online Room
-  socket.on('room:create', ({ roomName, playerName, avatar, color, role }, callback) => {
+  socket.on('room:create', ({ roomName, playerName, avatar, color, role, playerToken }, callback) => {
     const roomId = generateRoomCode();
     const playerId = `player-${Date.now()}-${Math.random().toString(36).substring(2, 6)}`;
 
@@ -197,6 +215,7 @@ io.on('connection', (socket: Socket) => {
     };
 
     rooms.set(roomId, newRoom);
+    if (playerToken) reconnectTokens.set(`${roomId}:${playerToken}`, playerId);
     currentRoomId = roomId;
     currentPlayerId = playerId;
 
@@ -209,7 +228,7 @@ io.on('connection', (socket: Socket) => {
   });
 
   // 2. Join an existing Online Room
-  socket.on('room:join', ({ roomId, playerName, avatar, color, role }, callback) => {
+  socket.on('room:join', ({ roomId, playerName, avatar, color, role, playerToken }, callback) => {
     const targetRoomId = (roomId || '').trim().toUpperCase();
     const room = rooms.get(targetRoomId);
 
@@ -218,28 +237,54 @@ io.on('connection', (socket: Socket) => {
       return;
     }
 
-    if (room.players.length >= 12) {
-      if (callback) callback({ ok: false, error: 'A sala já atingiu o limite máximo de 12 juristas.' });
-      return;
-    }
+    const cleanName = (playerName || '').trim();
+    const tokenKey = playerToken ? `${targetRoomId}:${playerToken}` : null;
 
-    // Check if player is reconnecting with same name
-    const existingPlayerIndex = room.players.findIndex(
-      (p) => p.name.toLowerCase() === playerName.trim().toLowerCase()
-    );
+    // RECONEXÃO SEGURA (só depois que a partida começou).
+    // 1) Por token (guardado no navegador do próprio jogador): é a forma confiável.
+    // 2) Por nome: só vale se a vaga estiver DESCONECTADA. Assim, ninguém consegue
+    //    "assumir" a vez de um colega que está online apenas digitando o mesmo nome.
+    let existing: OnlinePlayer | undefined;
+    if (room.phase !== 'lobby') {
+      const tokenPlayerId = tokenKey ? reconnectTokens.get(tokenKey) : undefined;
+      if (tokenPlayerId) {
+        existing = room.players.find((p) => p.id === tokenPlayerId);
+      }
+      if (!existing && cleanName) {
+        existing = room.players.find(
+          (p) =>
+            p.name.toLowerCase() === cleanName.toLowerCase() &&
+            (p.socketId === socket.id || !isSocketConnected(p.socketId))
+        );
+      }
+    }
 
     let joinedPlayer: OnlinePlayer;
 
-    if (existingPlayerIndex !== -1 && room.phase !== 'lobby') {
-      // Reconnection
-      room.players[existingPlayerIndex].socketId = socket.id;
-      joinedPlayer = room.players[existingPlayerIndex];
+    if (existing) {
+      existing.socketId = socket.id;
+      if (existing.isHost) room.hostSocketId = socket.id;
+      joinedPlayer = existing;
     } else {
+      if (room.players.length >= 12) {
+        if (callback) callback({ ok: false, error: 'A sala já atingiu o limite máximo de 12 juristas.' });
+        return;
+      }
+
+      if (
+        room.phase !== 'lobby' &&
+        cleanName &&
+        room.players.some((p) => p.name.toLowerCase() === cleanName.toLowerCase())
+      ) {
+        if (callback) callback({ ok: false, error: 'Já existe um jogador conectado com esse nome nesta partida. Use outro nome.' });
+        return;
+      }
+
       const playerId = `player-${Date.now()}-${Math.random().toString(36).substring(2, 6)}`;
       joinedPlayer = {
         id: playerId,
         socketId: socket.id,
-        name: playerName.trim() || `Aluno ${room.players.length + 1}`,
+        name: cleanName || `Aluno ${room.players.length + 1}`,
         avatar: avatar || '💼',
         color: color || '#3B82F6',
         accentColor: '#60A5FA',
@@ -256,6 +301,8 @@ io.on('connection', (socket: Socket) => {
       };
       room.players.push(joinedPlayer);
     }
+
+    if (tokenKey) reconnectTokens.set(tokenKey, joinedPlayer.id);
 
     currentRoomId = targetRoomId;
     currentPlayerId = joinedPlayer.id;
@@ -326,17 +373,31 @@ io.on('connection', (socket: Socket) => {
   });
 
   // 4. Roulette Spin Action
-  socket.on('game:spin_roulette', ({ roomId, steps, targetPosition, eventData, eventTile }) => {
+  socket.on('game:spin_roulette', ({ roomId, steps, eventData, eventTile }) => {
+    if (roomId !== currentRoomId) return;
     const room = rooms.get(roomId);
     if (!room || room.phase !== 'playing') return;
 
+    // Somente o jogador da vez pode girar a roleta.
+    if (!isActivePlayerSocket(room, socket.id)) {
+      console.warn(`[Multiplayer Security] Ignored game:spin_roulette from non-active socket ${socket.id}`);
+      return;
+    }
+
     const activePlayer = room.players[room.activePlayerIndex];
-    room.spinningNumber = steps;
+
+    const stepsNumber = Number(steps);
+    if (!Number.isInteger(stepsNumber) || stepsNumber < 1 || stepsNumber > MAX_ROULETTE_STEPS) return;
+
+    // A posição de destino é calculada pelo servidor (não confiamos no valor enviado pelo cliente).
+    const targetPosition = Math.min((activePlayer.position || 1) + stepsNumber, FINISH_TILE_ID);
+
+    room.spinningNumber = stepsNumber;
     room.phase = 'spinning';
 
     // Broadcast spin animation immediately
     io.to(roomId).emit('game:roulette_spun', {
-      steps,
+      steps: stepsNumber,
       playerId: activePlayer.id,
       playerName: activePlayer.name,
     });
@@ -346,7 +407,7 @@ io.on('connection', (socket: Socket) => {
       playerId: activePlayer.id,
       playerName: activePlayer.name,
       playerColor: activePlayer.color,
-      text: `Girou a roleta e tirou o número ${steps}!`,
+      text: `Girou a roleta e tirou o número ${stepsNumber}!`,
       type: 'spin',
       timestamp: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
     });
@@ -366,6 +427,7 @@ io.on('connection', (socket: Socket) => {
 
   // 5. Submit Question Answer (Strict Multiplayer Validation)
   socket.on('game:answer_question', ({ roomId, optionId, optionText, isCorrect, pointsEarned, penalty, explanation, legalBasis }) => {
+    if (roomId !== currentRoomId) return;
     const room = rooms.get(roomId);
     if (!room || !room.isEventModalOpen) return;
 
@@ -375,8 +437,7 @@ io.on('connection', (socket: Socket) => {
     // MULTIPLAYER SECURITY VALIDATION:
     // Only the active player corresponding to activePlayerIndex can answer.
     // If sent by any other socket, reject immediately and do not alter match state.
-    const isAuthorized = activePlayer.socketId === socket.id || (currentPlayerId && activePlayer.id === currentPlayerId);
-    if (!isAuthorized) {
+    if (!isActivePlayerSocket(room, socket.id)) {
       console.warn(`[Multiplayer Security] Ignored game:answer_question from unauthorized socket ${socket.id} (active player is ${activePlayer.name} [${activePlayer.id}])`);
       return;
     }
@@ -450,6 +511,7 @@ io.on('connection', (socket: Socket) => {
 
   // 6. Bonus Tile Choice Action
   socket.on('game:bonus_action', ({ roomId, bonusType, points, moveSteps, reputation, headline }) => {
+    if (roomId !== currentRoomId) return;
     const room = rooms.get(roomId);
     if (!room) return;
 
@@ -457,8 +519,7 @@ io.on('connection', (socket: Socket) => {
     if (!activePlayer) return;
 
     // Security: Only active player can choose bonus action
-    const isAuthorized = activePlayer.socketId === socket.id || (currentPlayerId && activePlayer.id === currentPlayerId);
-    if (!isAuthorized) return;
+    if (!isActivePlayerSocket(room, socket.id)) return;
 
     activePlayer.bonusCount = (activePlayer.bonusCount || 0) + 1;
     if (points) activePlayer.points += points;
@@ -481,24 +542,34 @@ io.on('connection', (socket: Socket) => {
   });
 
   // 7. Finish Tile Reached
-  socket.on('game:player_finished', ({ roomId, rank, bonusPoints }) => {
+  socket.on('game:player_finished', ({ roomId }) => {
+    if (roomId !== currentRoomId) return;
     const room = rooms.get(roomId);
     if (!room) return;
 
     const activePlayer = room.players[room.activePlayerIndex];
     if (!activePlayer) return;
 
+    // Segurança: só o jogador da vez (ou o anfitrião, ao avançar o turno) pode registrar a chegada.
+    if (!isActivePlayerSocket(room, socket.id) && socket.id !== room.hostSocketId) return;
+
+    // O servidor decide se o jogador realmente chegou e qual é a colocação/bônus.
+    if (activePlayer.isFinished || (activePlayer.position || 1) < FINISH_TILE_ID) return;
+
+    const rank = room.players.filter((p) => p.isFinished).length + 1;
+    const bonusPoints = 20;
+
     activePlayer.isFinished = true;
     activePlayer.finishRank = rank;
-    activePlayer.position = 35;
-    if (bonusPoints) activePlayer.points += bonusPoints;
+    activePlayer.position = FINISH_TILE_ID;
+    activePlayer.points += bonusPoints;
 
     room.logs.unshift({
       id: `log-${Date.now()}`,
       playerId: activePlayer.id,
       playerName: activePlayer.name,
       playerColor: activePlayer.color,
-      text: `🏁 Chegou na Linha de Chegada em ${rank}º Lugar! Bônus de chegada: +${bonusPoints || 0} pts`,
+      text: `🏁 Chegou na Linha de Chegada em ${rank}º Lugar! Bônus de chegada: +${bonusPoints} pts`,
       type: 'finish',
       timestamp: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
     });
@@ -508,14 +579,17 @@ io.on('connection', (socket: Socket) => {
 
   // 8. Close Event and Advance Turn
   socket.on('game:close_event', ({ roomId }) => {
+    if (roomId !== currentRoomId) return;
     const room = rooms.get(roomId);
     if (!room) return;
+
+    // Evita avançar o turno duas vezes (ex.: jogador da vez e anfitrião clicando ao mesmo tempo).
+    if (!room.isEventModalOpen) return;
 
     const activePlayer = room.players[room.activePlayerIndex];
     // Security: Only active player or room host can advance turn
     const isAuthorized = !activePlayer ||
-      activePlayer.socketId === socket.id ||
-      (currentPlayerId && activePlayer.id === currentPlayerId) ||
+      isActivePlayerSocket(room, socket.id) ||
       socket.id === room.hostSocketId;
     if (!isAuthorized) {
       console.warn(`[Multiplayer Security] game:close_event rejected from unauthorized socket ${socket.id}`);
@@ -614,7 +688,7 @@ io.on('connection', (socket: Socket) => {
       }
     } else {
       // In active game, mark presence or notify
-      if (leavingPlayer) {
+      if (leavingPlayer && leavingPlayer.socketId === socket.id) {
         room.chatMessages.push({
           id: `msg-${Date.now()}`,
           playerId: 'system',
