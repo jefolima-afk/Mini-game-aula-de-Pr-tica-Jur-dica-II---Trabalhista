@@ -10,13 +10,13 @@ export const API_URL: string = ((import.meta.env.VITE_API_URL as string | undefi
 
 export function getSocket(): Socket {
   if (!socket) {
-    socket = io(API_URL || undefined, {
-      autoConnect: true,
-      reconnection: true,
-      reconnectionAttempts: 15,
-      reconnectionDelay: 800,
-      transports: ['polling', 'websocket'],
-    });
+    socket = io(import.meta.env.VITE_API_URL || window.location.origin, {
+  autoConnect: true,
+  reconnection: true,
+  reconnectionAttempts: 10,
+  reconnectionDelay: 1000,
+  transports: ['websocket', 'polling'],
+});
   }
 
   return socket;
