@@ -764,7 +764,6 @@ export const ALL_QUESTIONS: ManualQuestion[] = [...REGULAR_QUESTIONS, ...FINISH_
 // Helper to get questions for a specific tile
 export function getQuestionsForTile(tileId: number): ManualQuestion[] {
   if (tileId === 35) {
-    Deseja carregar todas as superperguntas de chegada? // Retorna as superperguntas da casa 35
     return FINISH_SUPER_QUESTIONS;
   }
   return REGULAR_QUESTIONS.filter((q) => q.tileId === tileId);
