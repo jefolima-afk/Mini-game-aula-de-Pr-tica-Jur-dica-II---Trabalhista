@@ -426,13 +426,35 @@ io.on('connection', (socket: Socket) => {
   });
 
   // 5. Submit Question Answer (Strict Multiplayer Validation)
-  socket.on('game:answer_question', ({ roomId, optionId, optionText, isCorrect, pointsEarned, penalty, explanation, legalBasis }) => {
-    if (roomId !== currentRoomId) return;
-    const room = rooms.get(roomId);
-    if (!room || !room.isEventModalOpen) return;
+  socket.on('game:answer_question', ({ roomId, optionId, optionText, isCorrect, pointsEarned, penalty, explanation, legalBasis }, callback) => {
+  const reply = (res: { ok: boolean; error?: string }) => {
+    if (typeof callback === 'function') callback(res);
+  };
 
-    const activePlayer = room.players[room.activePlayerIndex];
-    if (!activePlayer) return;
+  if (roomId !== currentRoomId)
+    return reply({ ok: false, error: 'Sua conexão não está vinculada a esta sala. Recarregue a página.' });
+
+  const room = rooms.get(roomId);
+  if (!room || !room.isEventModalOpen)
+    return reply({ ok: false, error: 'Não há pergunta aberta no momento.' });
+
+  const activePlayer = room.players[room.activePlayerIndex];
+  if (!activePlayer) return reply({ ok: false, error: 'Jogador da vez não encontrado.' });
+
+  if (!isActivePlayerSocket(room, socket.id)) {
+    console.warn(`[Multiplayer Security] answer_question recusado: socket ${socket.id}, jogador da vez ${activePlayer.name}`);
+    return reply({ ok: false, error: 'Não é a sua vez de responder.' });
+  }
+
+  if (room.activeQuestionAnswer)
+    return reply({ ok: false, error: 'Esta pergunta já foi respondida.' });
+
+  // ...resto do handler igual...
+
+  io.to(roomId).emit('game:question_answered', questionAnswer);
+  io.to(roomId).emit('room:updated', room);
+  reply({ ok: true });
+});
 
     // MULTIPLAYER SECURITY VALIDATION:
     // Only the active player corresponding to activePlayerIndex can answer.
