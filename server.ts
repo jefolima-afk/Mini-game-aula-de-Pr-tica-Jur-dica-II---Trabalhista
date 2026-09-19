@@ -4,16 +4,31 @@ import path from 'path';
 import { Server as SocketIOServer, Socket } from 'socket.io';
 import { createServer as createViteServer } from 'vite';
 
-const PORT = 3000;
+// Railway (e a maioria das hospedagens) injeta a porta em process.env.PORT.
+const PORT = Number(process.env.PORT) || 3000;
+// Origem permitida (ex.: https://seu-jogo.vercel.app). Sem a variável, libera qualquer origem.
+const CORS_ORIGIN = process.env.CORS_ORIGIN || '*';
 const app = express();
 const server = http.createServer(app);
 
 // Initialize Socket.io with permissive CORS for container preview iframe
 const io = new SocketIOServer(server, {
   cors: {
-    origin: '*',
+    origin: CORS_ORIGIN,
     methods: ['GET', 'POST'],
   },
+});
+
+// CORS para a API REST (o front na Vercel chama /api/rooms no domínio do Railway).
+app.use('/api', (req, res, next) => {
+  res.header('Access-Control-Allow-Origin', CORS_ORIGIN);
+  res.header('Access-Control-Allow-Methods', 'GET, POST, OPTIONS');
+  res.header('Access-Control-Allow-Headers', 'Content-Type');
+  if (req.method === 'OPTIONS') {
+    res.sendStatus(204);
+    return;
+  }
+  next();
 });
 
 app.use(express.json());
