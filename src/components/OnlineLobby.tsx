@@ -24,7 +24,7 @@ import {
 } from 'lucide-react';
 import { CesurgLogo } from './CesurgLogo';
 import { OnlinePlayer, OnlineRoom, ChatMessage } from '../types';
-import { getSocket } from '../utils/socket';
+import { getSocket, getPlayerToken } from '../utils/socket';
 import { sound } from '../utils/audio';
 
 const AVATARS = ['⚖️', '🏛️', '📜', '💼', '🎓', '🖋️', '🔍', '🏆', '👨‍⚖️', '👩‍⚖️', '📚', '⚡'];
@@ -170,6 +170,7 @@ export const OnlineLobby: React.FC<OnlineLobbyProps> = ({
         avatar: createAvatar,
         color: createColor,
         role: createRole,
+        playerToken: getPlayerToken(),
       },
       (res: { ok: boolean; roomId?: string; player?: OnlinePlayer; room?: OnlineRoom; error?: string }) => {
         setIsSubmitting(false);
@@ -208,6 +209,7 @@ export const OnlineLobby: React.FC<OnlineLobbyProps> = ({
         avatar: joinAvatar,
         color: joinColor,
         role: joinRole,
+        playerToken: getPlayerToken(),
       },
       (res: { ok: boolean; roomId?: string; player?: OnlinePlayer; room?: OnlineRoom; error?: string }) => {
         setIsSubmitting(false);
