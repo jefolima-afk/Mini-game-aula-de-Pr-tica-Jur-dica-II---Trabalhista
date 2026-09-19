@@ -6,13 +6,15 @@ import { Player } from '../types';
 interface PlayersListProps {
   players: Player[];
   activePlayerId: string;
-  totalTiles: number;
+  totalTiles?: number;
+  myPlayerId?: string;
 }
 
 export const PlayersList: React.FC<PlayersListProps> = ({
   players,
   activePlayerId,
   totalTiles = 35,
+  myPlayerId,
 }) => {
   // Compute rankings based on points descending
   const sortedByPoints = [...players].sort((a, b) => b.points - a.points);
@@ -107,6 +109,11 @@ export const PlayersList: React.FC<PlayersListProps> = ({
                       <h4 className="text-xs font-bold text-white truncate leading-tight">
                         {p.name}
                       </h4>
+                      {myPlayerId === p.id && (
+                        <span className="text-[9px] font-black text-amber-300 bg-amber-500/20 px-1 py-0.2 rounded border border-amber-400/40">
+                          Você
+                        </span>
+                      )}
                       {isActive && (
                         <span className="w-1.5 h-1.5 rounded-full bg-amber-400 animate-pulse flex-shrink-0" />
                       )}

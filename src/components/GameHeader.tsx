@@ -6,7 +6,10 @@ import {
   History, 
   BookOpen, 
   RotateCcw,
-  Trophy
+  Trophy,
+  Copy,
+  Check,
+  DoorOpen
 } from 'lucide-react';
 import { sound } from '../utils/audio';
 import { CesurgLogo } from './CesurgLogo';
@@ -15,27 +18,43 @@ interface GameHeaderProps {
   round: number;
   totalLogs: number;
   isPlaying?: boolean;
+  onlineRoomCode?: string;
+  myPlayerName?: string;
+  myPlayerAvatar?: string;
   onOpenLogs: () => void;
   onOpenRules: () => void;
   onRestartPrompt: () => void;
   onFinishPrompt?: () => void;
+  onReturnToLobby?: () => void;
 }
 
 export const GameHeader: React.FC<GameHeaderProps> = ({
   round,
   totalLogs,
   isPlaying = false,
+  onlineRoomCode,
+  myPlayerName,
+  myPlayerAvatar,
   onOpenLogs,
   onOpenRules,
   onRestartPrompt,
   onFinishPrompt,
+  onReturnToLobby,
 }) => {
   const [isMuted, setIsMuted] = useState(sound.getMuted());
+  const [copiedCode, setCopiedCode] = useState(false);
 
   const toggleSound = () => {
     const nextMute = !isMuted;
     setIsMuted(nextMute);
     sound.setMuted(nextMute);
+  };
+
+  const handleCopyCode = () => {
+    if (!onlineRoomCode) return;
+    navigator.clipboard.writeText(onlineRoomCode);
+    setCopiedCode(true);
+    setTimeout(() => setCopiedCode(false), 2000);
   };
 
   return (
@@ -47,17 +66,50 @@ export const GameHeader: React.FC<GameHeaderProps> = ({
           <Scale className="w-5 h-5" />
         </div>
         <div className="min-w-0">
-          <h1 className="text-base sm:text-lg font-extrabold font-display text-white tracking-tight leading-none truncate">
-            Prática do Trabalho
-          </h1>
-          <span className="text-[10px] text-amber-400 font-semibold uppercase tracking-wider block truncate mt-0.5">
-            Prof. Ma. Giulia Signor • Rodada {round}
-          </span>
+          <div className="flex items-center gap-2">
+            <h1 className="text-base sm:text-lg font-extrabold font-display text-white tracking-tight leading-none truncate">
+              Prática do Trabalho
+            </h1>
+            {onlineRoomCode && (
+              <button
+                type="button"
+                onClick={handleCopyCode}
+                title="Clique para copiar código da sala"
+                className="hidden sm:inline-flex items-center gap-1 px-2 py-0.5 rounded-full bg-amber-400/20 hover:bg-amber-400/30 text-amber-300 border border-amber-400/40 text-[10px] font-mono font-bold cursor-pointer transition-all"
+              >
+                <span>Sala: {onlineRoomCode}</span>
+                {copiedCode ? <Check className="w-3 h-3 text-emerald-400" /> : <Copy className="w-3 h-3" />}
+              </button>
+            )}
+          </div>
+          <div className="flex items-center gap-2 mt-0.5">
+            <span className="text-[10px] text-amber-400 font-semibold uppercase tracking-wider block truncate">
+              Prof. Ma. Giulia Signor • Rodada {round}
+            </span>
+            {myPlayerName && (
+              <span className="text-[10px] text-slate-300 font-medium hidden md:inline truncate">
+                • Você: {myPlayerAvatar} {myPlayerName}
+              </span>
+            )}
+          </div>
         </div>
       </div>
 
       {/* Control Actions */}
       <div className="flex items-center gap-1.5 sm:gap-2">
+        {/* Return to Lobby Button */}
+        {onReturnToLobby && (
+          <button
+            type="button"
+            id="btn-return-lobby"
+            onClick={onReturnToLobby}
+            title="Voltar ao Lobby de Salas"
+            className="px-2.5 py-2 rounded-xl bg-slate-800/80 hover:bg-slate-700/80 border border-slate-700 text-slate-300 hover:text-white text-xs font-semibold flex items-center gap-1.5 transition-all cursor-pointer"
+          >
+            <DoorOpen className="w-4 h-4 text-amber-400" />
+            <span className="hidden sm:inline">Lobby</span>
+          </button>
+        )}
         {/* Sound Toggle */}
         <button
           id="btn-toggle-sound"

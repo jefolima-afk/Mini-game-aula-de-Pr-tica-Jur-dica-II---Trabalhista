@@ -31,6 +31,12 @@ interface GameOverModalProps {
   isOpen: boolean;
   players: Player[];
   onRestartGame: () => void;
+  isOnline?: boolean;
+  isHost?: boolean;
+  onCeremonyStepChange?: (step: CeremonyStep, bottomRevealedCount: number, areFinalistsRevealed: boolean) => void;
+  externalCeremonyStep?: CeremonyStep;
+  externalBottomRevealedCount?: number;
+  externalAreFinalistsRevealed?: boolean;
 }
 
 type CeremonyStep = 'bonus_most_answered' | 'bonus_most_correct' | 'bonus_fewest_answered' | 'ranking_reveal';
@@ -39,6 +45,12 @@ export const GameOverModal: React.FC<GameOverModalProps> = ({
   isOpen,
   players,
   onRestartGame,
+  isOnline = false,
+  isHost = true,
+  onCeremonyStepChange,
+  externalCeremonyStep,
+  externalBottomRevealedCount,
+  externalAreFinalistsRevealed,
 }) => {
   const [currentStep, setCurrentStep] = useState<CeremonyStep>('bonus_most_answered');
   const [bottomRevealedCount, setBottomRevealedCount] = useState<number>(0);
@@ -48,6 +60,35 @@ export const GameOverModal: React.FC<GameOverModalProps> = ({
   const [isPlayingSenna, setIsPlayingSenna] = useState<boolean>(false);
   const [customAudioName, setCustomAudioName] = useState<string | null>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
+
+  // Synchronize external online ceremony updates from host
+  useEffect(() => {
+    if (isOnline && !isHost) {
+      if (externalCeremonyStep && externalCeremonyStep !== currentStep) {
+        setCurrentStep(externalCeremonyStep);
+      }
+      if (externalBottomRevealedCount !== undefined && externalBottomRevealedCount !== bottomRevealedCount) {
+        setBottomRevealedCount(externalBottomRevealedCount);
+      }
+      if (externalAreFinalistsRevealed !== undefined && externalAreFinalistsRevealed !== areFinalistsRevealed) {
+        setAreFinalistsRevealed(externalAreFinalistsRevealed);
+        if (externalAreFinalistsRevealed && !hasTriggeredChampionEffects) {
+          setHasTriggeredChampionEffects(true);
+          triggerChampionCelebration();
+        }
+      }
+    }
+  }, [
+    isOnline,
+    isHost,
+    externalCeremonyStep,
+    externalBottomRevealedCount,
+    externalAreFinalistsRevealed,
+    currentStep,
+    bottomRevealedCount,
+    areFinalistsRevealed,
+    hasTriggeredChampionEffects,
+  ]);
 
   // Compute all bonus categories and final scores
   const evaluation = useMemo(() => {
@@ -231,12 +272,20 @@ export const GameOverModal: React.FC<GameOverModalProps> = ({
     }
   };
 
+  // Helper to change ceremony step and notify online peers if host
+  const changeStep = (newStep: CeremonyStep) => {
+    if (isOnline && !isHost) return;
+    setCurrentStep(newStep);
+    onCeremonyStepChange?.(newStep, bottomRevealedCount, areFinalistsRevealed);
+  };
+
   // Reveal next position from BOTTOM to TOP
   const handleRevealNext = () => {
     if (bottomRevealedCount < bottomPositionsCount) {
       const nextCount = bottomRevealedCount + 1;
       setBottomRevealedCount(nextCount);
       sound.playRevealSound(nextCount);
+      onCeremonyStepChange?.(currentStep, nextCount, areFinalistsRevealed);
     } else if (!areFinalistsRevealed) {
       // Ready to reveal finalists together
       handleRevealFinalistsTogether();
@@ -252,6 +301,7 @@ export const GameOverModal: React.FC<GameOverModalProps> = ({
     setTimeout(() => {
       setIsSuspenseLoading(false);
       setAreFinalistsRevealed(true);
+      onCeremonyStepChange?.(currentStep, bottomPositionsCount, true);
       if (!hasTriggeredChampionEffects) {
         setHasTriggeredChampionEffects(true);
         triggerChampionCelebration();
@@ -263,6 +313,7 @@ export const GameOverModal: React.FC<GameOverModalProps> = ({
   const handleRevealAll = () => {
     setBottomRevealedCount(bottomPositionsCount);
     setAreFinalistsRevealed(true);
+    onCeremonyStepChange?.(currentStep, bottomPositionsCount, true);
     if (!hasTriggeredChampionEffects) {
       setHasTriggeredChampionEffects(true);
       setTimeout(triggerChampionCelebration, 300);
@@ -314,7 +365,7 @@ export const GameOverModal: React.FC<GameOverModalProps> = ({
           <div className="grid grid-cols-4 gap-1 sm:gap-1.5 max-w-2xl mx-auto pt-0.5">
             <button
               type="button"
-              onClick={() => setCurrentStep('bonus_most_answered')}
+              onClick={() => changeStep('bonus_most_answered')}
               className={`p-1 sm:p-1.5 rounded-lg text-center border transition-all cursor-pointer ${
                 currentStep === 'bonus_most_answered'
                   ? 'bg-amber-500/20 border-amber-400 text-white shadow-sm'
@@ -327,7 +378,7 @@ export const GameOverModal: React.FC<GameOverModalProps> = ({
 
             <button
               type="button"
-              onClick={() => setCurrentStep('bonus_most_correct')}
+              onClick={() => changeStep('bonus_most_correct')}
               className={`p-1 sm:p-1.5 rounded-lg text-center border transition-all cursor-pointer ${
                 currentStep === 'bonus_most_correct'
                   ? 'bg-amber-500/20 border-amber-400 text-white shadow-sm'
@@ -340,7 +391,7 @@ export const GameOverModal: React.FC<GameOverModalProps> = ({
 
             <button
               type="button"
-              onClick={() => setCurrentStep('bonus_fewest_answered')}
+              onClick={() => changeStep('bonus_fewest_answered')}
               className={`p-1 sm:p-1.5 rounded-lg text-center border transition-all cursor-pointer ${
                 currentStep === 'bonus_fewest_answered'
                   ? 'bg-amber-500/20 border-amber-400 text-white shadow-sm'
@@ -353,7 +404,7 @@ export const GameOverModal: React.FC<GameOverModalProps> = ({
 
             <button
               type="button"
-              onClick={() => setCurrentStep('ranking_reveal')}
+              onClick={() => changeStep('ranking_reveal')}
               className={`p-1 sm:p-1.5 rounded-lg text-center border transition-all cursor-pointer ${
                 currentStep === 'ranking_reveal'
                   ? 'bg-gradient-to-r from-amber-500 to-yellow-500 text-slate-950 border-amber-300 font-bold shadow'
@@ -448,7 +499,7 @@ export const GameOverModal: React.FC<GameOverModalProps> = ({
                     type="button"
                     id="btn-next-bonus-1"
                     onClick={() => {
-                      setCurrentStep('bonus_most_correct');
+                      changeStep('bonus_most_correct');
                       sound.playAwardTrumpet();
                     }}
                     className="px-5 py-2.5 rounded-xl font-bold text-xs sm:text-sm bg-gradient-to-r from-amber-400 to-amber-500 hover:from-amber-300 hover:to-amber-400 text-slate-950 shadow-md shadow-amber-500/25 active:scale-95 transition-all inline-flex items-center gap-2 cursor-pointer font-display"
@@ -539,7 +590,7 @@ export const GameOverModal: React.FC<GameOverModalProps> = ({
                     type="button"
                     id="btn-next-bonus-2"
                     onClick={() => {
-                      setCurrentStep('bonus_fewest_answered');
+                      changeStep('bonus_fewest_answered');
                       sound.playAwardTrumpet();
                     }}
                     className="px-5 py-2.5 rounded-xl font-bold text-xs sm:text-sm bg-gradient-to-r from-emerald-400 to-emerald-500 hover:from-emerald-300 hover:to-emerald-400 text-slate-950 shadow-md shadow-emerald-500/25 active:scale-95 transition-all inline-flex items-center gap-2 cursor-pointer font-display"
@@ -630,7 +681,7 @@ export const GameOverModal: React.FC<GameOverModalProps> = ({
                     type="button"
                     id="btn-next-to-ranking"
                     onClick={() => {
-                      setCurrentStep('ranking_reveal');
+                      changeStep('ranking_reveal');
                       sound.playRevealSound(1);
                     }}
                     className="px-6 py-2.5 rounded-xl font-bold text-xs sm:text-sm bg-gradient-to-r from-amber-400 via-amber-500 to-yellow-500 hover:from-amber-300 hover:to-amber-400 text-slate-950 shadow-lg shadow-amber-500/30 active:scale-95 transition-all inline-flex items-center gap-2 cursor-pointer font-display animate-pulse"
@@ -669,7 +720,12 @@ export const GameOverModal: React.FC<GameOverModalProps> = ({
 
                   {/* Action Buttons */}
                   <div className="flex items-center gap-1.5 flex-wrap justify-center">
-                    {!areFinalistsRevealed ? (
+                    {isOnline && !isHost ? (
+                      <div className="px-3.5 py-1.5 rounded-xl bg-amber-500/15 border border-amber-400/40 text-amber-300 text-xs font-semibold flex items-center gap-1.5">
+                        <span className="w-2 h-2 rounded-full bg-amber-400 animate-ping" />
+                        <span>Aguardando o professor(a) avançar a revelação do pódio... 🥁</span>
+                      </div>
+                    ) : !areFinalistsRevealed ? (
                       <>
                         {bottomRevealedCount < bottomPositionsCount ? (
                           <button

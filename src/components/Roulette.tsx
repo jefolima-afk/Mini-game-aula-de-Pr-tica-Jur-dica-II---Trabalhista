@@ -8,6 +8,8 @@ interface RouletteProps {
   onSpinEnd: (result: number) => void;
   disabled: boolean;
   currentPlayer: Player;
+  isMyTurn?: boolean;
+  externalSpinTarget?: number | null;
 }
 
 const SEGMENTS = [
@@ -24,7 +26,13 @@ const SEGMENTS = [
 const NUM_SEGMENTS = SEGMENTS.length;
 const SEGMENT_ANGLE = 360 / NUM_SEGMENTS;
 
-export const Roulette: React.FC<RouletteProps> = ({ onSpinEnd, disabled, currentPlayer }) => {
+export const Roulette: React.FC<RouletteProps> = ({
+  onSpinEnd,
+  disabled,
+  currentPlayer,
+  isMyTurn = true,
+  externalSpinTarget = null,
+}) => {
   const [isSpinning, setIsSpinning] = useState(false);
   const [rotation, setRotation] = useState(0);
   const [lastResult, setLastResult] = useState<number | null>(null);
@@ -41,25 +49,18 @@ export const Roulette: React.FC<RouletteProps> = ({ onSpinEnd, disabled, current
     };
   }, []);
 
-  const spinWheel = () => {
-    if (isSpinning || disabled) return;
+  const runSpinAnimation = (targetNum: number) => {
+    if (isSpinning) return;
 
     sound.playSpinStart();
     setIsSpinning(true);
     setLastResult(null);
 
-    // Pick random target number (1 to 8)
-    const targetNum = Math.floor(Math.random() * NUM_SEGMENTS) + 1;
     const targetIndex = SEGMENTS.findIndex((s) => s.num === targetNum);
-
-    // Pointer is located at top (12 o'clock / 270 deg)
     const segmentCenter = targetIndex * SEGMENT_ANGLE + SEGMENT_ANGLE / 2;
-    const extraSpins = (5 + Math.floor(Math.random() * 3)) * 360; // 5 to 7 full rotations
-    
-    // Slight random offset inside segment for organic feel (+/- 12 deg)
+    const extraSpins = (5 + Math.floor(Math.random() * 3)) * 360;
     const randomJitter = (Math.random() - 0.5) * (SEGMENT_ANGLE * 0.5);
-    
-    // Calculate final rotation
+
     const baseTargetAngle = 270 - segmentCenter + randomJitter;
     const currentRot = rotationRef.current % 360;
     const diff = (baseTargetAngle - currentRot + 360) % 360;
@@ -67,22 +68,19 @@ export const Roulette: React.FC<RouletteProps> = ({ onSpinEnd, disabled, current
 
     const startRot = rotationRef.current;
     const totalDelta = finalRotation - startRot;
-    const duration = 3600; // ms
+    const duration = 3600;
     const startTime = performance.now();
     lastTickAngleRef.current = startRot;
 
     const animate = (currentTime: number) => {
       const elapsed = currentTime - startTime;
       const progress = Math.min(elapsed / duration, 1);
-
-      // Cubic ease-out deceleration
       const easeOut = 1 - Math.pow(1 - progress, 3.8);
       const currentAngle = startRot + totalDelta * easeOut;
 
       rotationRef.current = currentAngle;
       setRotation(currentAngle);
 
-      // Trigger tick sound and needle bounce on each segment border crossed
       const passedAngle = currentAngle - lastTickAngleRef.current;
       if (passedAngle >= SEGMENT_ANGLE) {
         sound.playRouletteTick(progress);
@@ -93,7 +91,6 @@ export const Roulette: React.FC<RouletteProps> = ({ onSpinEnd, disabled, current
       if (progress < 1) {
         animFrameRef.current = requestAnimationFrame(animate);
       } else {
-        // Finished spinning
         setNeedleBounce(0);
         setIsSpinning(false);
         setLastResult(targetNum);
@@ -105,6 +102,19 @@ export const Roulette: React.FC<RouletteProps> = ({ onSpinEnd, disabled, current
     };
 
     animFrameRef.current = requestAnimationFrame(animate);
+  };
+
+  // Trigger spin when externalSpinTarget arrives
+  useEffect(() => {
+    if (externalSpinTarget && !isSpinning) {
+      runSpinAnimation(externalSpinTarget);
+    }
+  }, [externalSpinTarget]);
+
+  const spinWheel = () => {
+    if (isSpinning || disabled || !isMyTurn) return;
+    const targetNum = Math.floor(Math.random() * NUM_SEGMENTS) + 1;
+    runSpinAnimation(targetNum);
   };
 
   return (
@@ -196,10 +206,10 @@ export const Roulette: React.FC<RouletteProps> = ({ onSpinEnd, disabled, current
         <button
           id="btn-spin-roulette"
           onClick={spinWheel}
-          disabled={isSpinning || disabled}
+          disabled={isSpinning || disabled || !isMyTurn}
           aria-label="Girar Roleta da Vida"
           className={`absolute z-20 w-16 h-16 sm:w-20 sm:h-20 rounded-full flex flex-col items-center justify-center font-display font-bold shadow-2xl transition-transform active:scale-95 ${
-            isSpinning || disabled
+            isSpinning || disabled || !isMyTurn
               ? 'bg-slate-700 text-slate-400 cursor-not-allowed border-2 border-slate-600 opacity-90'
               : 'bg-gradient-to-br from-amber-400 via-amber-500 to-yellow-600 hover:from-amber-300 hover:to-amber-500 text-slate-950 border-2 sm:border-3 border-amber-200 cursor-pointer hover:scale-105 shadow-amber-500/50'
           }`}
@@ -208,6 +218,13 @@ export const Roulette: React.FC<RouletteProps> = ({ onSpinEnd, disabled, current
             <div className="flex flex-col items-center">
               <Dices className="w-5 h-5 sm:w-6 sm:h-6 animate-spin text-slate-300" />
               <span className="text-[9px] sm:text-[10px] uppercase font-black tracking-wider mt-0.5">Gira...</span>
+            </div>
+          ) : !isMyTurn ? (
+            <div className="flex flex-col items-center leading-tight">
+              <span className="text-[9px] sm:text-[10px] uppercase font-black tracking-wider text-slate-400">VEZ DE</span>
+              <span className="text-[9px] sm:text-[10px] font-bold text-amber-300 truncate max-w-[50px]">
+                {currentPlayer.name.split(' ')[0]}
+              </span>
             </div>
           ) : (
             <div className="flex flex-col items-center leading-tight">
@@ -246,7 +263,11 @@ export const Roulette: React.FC<RouletteProps> = ({ onSpinEnd, disabled, current
           </motion.div>
         ) : (
           <p className="text-slate-400 text-xs font-medium">
-            {isSpinning ? 'Torcendo pela sorte...' : 'Toque em GIRAR para andar!'}
+            {isSpinning
+              ? 'Torcendo pela sorte...'
+              : !isMyTurn
+              ? `Vez de ${currentPlayer.name} jogar... Aguardando lance`
+              : 'Toque em GIRAR para andar!'}
           </p>
         )}
       </div>

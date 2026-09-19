@@ -1,11 +1,12 @@
 import React, { useState } from 'react';
 import { motion } from 'motion/react';
-import { Users, Play, Plus, Minus, UserCheck, Scale } from 'lucide-react';
+import { Users, Play, Plus, Minus, UserCheck, Scale, ArrowLeft } from 'lucide-react';
 import { Player } from '../types';
 import { CesurgLogo } from './CesurgLogo';
 
 interface PlayerSetupProps {
   onStartGame: (players: Player[]) => void;
+  onBackToLobby?: () => void;
 }
 
 const COLOR_PALETTE = [
@@ -40,7 +41,7 @@ const LEGAL_ROLES = [
   'Defensor(a) Público(a) Trabalhista',
 ];
 
-export const PlayerSetup: React.FC<PlayerSetupProps> = ({ onStartGame }) => {
+export const PlayerSetup: React.FC<PlayerSetupProps> = ({ onStartGame, onBackToLobby }) => {
   // Configured default to 7 players with limit up to 12
   const [numPlayers, setNumPlayers] = useState<number>(7);
   const [playersData, setPlayersData] = useState<
@@ -98,7 +99,18 @@ export const PlayerSetup: React.FC<PlayerSetupProps> = ({ onStartGame }) => {
   };
 
   return (
-    <div className="w-full max-w-4xl mx-auto p-4 sm:p-6 bg-slate-900/95 border border-slate-800 rounded-3xl shadow-2xl backdrop-blur-xl">
+    <div className="w-full max-w-4xl mx-auto p-4 sm:p-6 bg-slate-900/95 border border-slate-800 rounded-3xl shadow-2xl backdrop-blur-xl relative">
+      {onBackToLobby && (
+        <button
+          type="button"
+          onClick={onBackToLobby}
+          className="sm:absolute top-5 left-5 mb-3 sm:mb-0 px-3 py-1.5 rounded-xl bg-slate-800 hover:bg-slate-700 text-slate-300 hover:text-white text-xs font-semibold flex items-center gap-1.5 border border-slate-700 transition-all cursor-pointer shadow-sm"
+        >
+          <ArrowLeft className="w-3.5 h-3.5" />
+          <span>Lobby Online</span>
+        </button>
+      )}
+
       {/* Brand Header: CESURG Logo & Disciplina/Professora */}
       <div className="text-center space-y-3 mb-6">
         {/* Logo CESURG em linha única e centralizada */}

@@ -110,3 +110,56 @@ export interface GameLogEntry {
   type: 'spin' | 'move' | 'event' | 'finish';
   timestamp: string;
 }
+
+export interface OnlinePlayer {
+  id: string;
+  socketId: string;
+  name: string;
+  avatar: string;
+  color: string;
+  accentColor: string;
+  role: string;
+  isHost: boolean;
+  points: number;
+  reputation: number;
+  position: number;
+  isFinished: boolean;
+  finishRank?: number;
+  skipNextTurn?: boolean;
+  questionsAnsweredCount: number;
+  correctAnswersCount: number;
+  bonusCount: number;
+  achievements: string[];
+}
+
+export interface ChatMessage {
+  id: string;
+  playerId: string;
+  playerName: string;
+  playerAvatar: string;
+  playerColor: string;
+  text: string;
+  timestamp: string;
+  isSystem?: boolean;
+}
+
+export interface OnlineRoom {
+  roomId: string;
+  roomName: string;
+  hostSocketId: string;
+  phase: 'lobby' | 'playing' | 'spinning' | 'moving' | 'event' | 'game_over';
+  players: OnlinePlayer[];
+  activePlayerIndex: number;
+  round: number;
+  logs: any[];
+  chatMessages: ChatMessage[];
+  currentEvent: any | null;
+  currentEventTile: any | null;
+  isEventModalOpen: boolean;
+  spinningNumber: number | null;
+  ceremonyStep?: string;
+  bottomRevealedCount?: number;
+  areFinalistsRevealed?: boolean;
+  createdAt: number;
+}
+
