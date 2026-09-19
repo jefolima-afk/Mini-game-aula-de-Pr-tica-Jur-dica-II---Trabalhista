@@ -1,6 +1,5 @@
 import { ManualQuestion } from './questionTypes';
 
-// Base content library directly from the 142 grounded questions manual
 interface QuestionTemplate {
   topic: string;
   level: 'Fácil' | 'Média' | 'Difícil';
@@ -11,522 +10,142 @@ interface QuestionTemplate {
   legalBasis: string;
 }
 
+// O banco oficial possui 7 perguntas base que se repetem em formato de rodízio pelas casas[cite: 1].
 const TEMPLATES: Record<string, QuestionTemplate> = {
-  peticao_requisitos: {
-    topic: 'Petição Inicial - Requisitos',
+  prazo_ro: {
+    topic: 'Recurso Ordinário - Prazo',
     level: 'Fácil',
     points: 10,
-    statementTpl: 'Segundo o art. 840, § 1º da CLT, qual é um requisito essencial da reclamação trabalhista escrita?',
+    statementTpl: 'Segundo a CLT, qual é o prazo legal para a interposição do Recurso Ordinário em dissídios individuais?', //[cite: 1]
     options: [
-      { letter: 'A', text: 'Apresentação prévia de certidão negativa de débitos' },
-      { letter: 'B', text: 'Pedido certo, determinado e com indicação de seu valor' },
-      { letter: 'C', text: 'Homologação do sindicato profissional' },
-      { letter: 'D', text: 'Juntada obrigatória de no mínimo três orçamentos' },
+      { letter: 'A', text: '15 dias conforme as regras gerais do CPC.' }, //[cite: 1]
+      { letter: 'B', text: '10 dias úteis contados da audiência de julgamento.' }, //[cite: 1]
+      { letter: 'C', text: '5 dias corridos a partir da publicação da sentença.' }, //[cite: 1]
+      { letter: 'D', text: '8 dias úteis a contar da intimação da decisão.' }, //[cite: 1]
     ],
-    correctLetter: 'B',
-    legalBasis: 'Art. 840, § 1º da CLT: A reclamação escrita conterá designação do juízo, qualificação das partes, breve exposição dos fatos, pedido certo, determinado e indicação de valor.',
+    correctLetter: 'D', // O gabarito correto muda conforme a carta, mas mapearemos de acordo com o texto da opção D[cite: 1]. 
+    // Nota: No PDF a ordem das letras muda em cada carta, mas o texto correto é sempre "8 dias". Centralizamos a alternativa correta na letra fixa D neste template.
+    legalBasis: 'Art. 895, I da CLT: O Recurso Ordinário deve ser interposto no prazo de 8 dias.', //[cite: 1]
   },
-  peticao_sumarissimo: {
-    topic: 'Petição Inicial - Rito Sumaríssimo',
+  testemunhas_sum: {
+    topic: 'Rito Sumaríssimo - Testemunhas',
     level: 'Fácil',
     points: 10,
-    statementTpl: 'Qual é o valor limite da causa para o enquadramento no procedimento sumaríssimo?',
+    statementTpl: 'No procedimento sumaríssimo trabalhista, qual o número máximo de testemunhas que cada parte pode indicar?', //[cite: 1]
     options: [
-      { letter: 'A', text: 'Até 20 salários-mínimos' },
-      { letter: 'B', text: 'Até 30 salários-mínimos' },
-      { letter: 'C', text: 'Até 40 salários-mínimos' },
-      { letter: 'D', text: 'Mais de 40 salários-mínimos' },
+      { letter: 'A', text: 'Até 6 testemunhas por parte.' }, //[cite: 1]
+      { letter: 'B', text: 'Até 2 testemunhas por parte.' }, //[cite: 1]
+      { letter: 'C', text: 'Até 4 testemunhas por parte.' }, //[cite: 1]
+      { letter: 'D', text: 'Até 3 testemunhas por parte.' }, //[cite: 1]
     ],
-    correctLetter: 'C',
-    legalBasis: 'Art. 852-A da CLT: Causas de até 40 salários-mínimos enquadram-se no rito sumaríssimo; acima de 40 no rito ordinário.',
+    correctLetter: 'B', //[cite: 1]
+    legalBasis: 'Art. 852-H, § 2º da CLT: Cada parte poderá indicar até duas testemunhas no rito sumaríssimo.', //[cite: 1]
   },
-  peticao_emenda: {
-    topic: 'Petição Inicial - Emenda à Inicial',
+  ausencia_reclamante: {
+    topic: 'Audiência - Ausência',
     level: 'Média',
     points: 20,
-    statementTpl: 'Qual o prazo concedido para o autor emendar a petição inicial e sanar vícios formais?',
+    statementTpl: 'Qual a penalidade aplicável ao Reclamante que não comparece à audiência inaugural sem justificativa legal?', //[cite: 1]
     options: [
-      { letter: 'A', text: '5 dias' },
-      { letter: 'B', text: '10 dias' },
-      { letter: 'C', text: '15 dias' },
-      { letter: 'D', text: '8 dias' },
+      { letter: 'A', text: 'Multa de 10% sobre o valor da causa em favor do réu.' }, //[cite: 1]
+      { letter: 'B', text: 'Decretação de revelia e confissão ficta dos fatos.' }, //[cite: 1]
+      { letter: 'C', text: 'Arquivamento da reclamação trabalhista e condenação em custas.' }, //[cite: 1]
+      { letter: 'D', text: 'Extinção com resolução do mérito por renúncia ao direito.' }, //[cite: 1]
     ],
-    correctLetter: 'C',
-    legalBasis: 'Súmula 263 do TST e Art. 321 do CPC: A emenda à inicial é o meio para corrigir vícios sanáveis no prazo de 15 dias, sob pena de indeferimento sem resolução do mérito.',
+    correctLetter: 'C', //[cite: 1]
+    legalBasis: 'Art. 844 da CLT: O não comparecimento do reclamante importa o arquivamento da reclamação.', //[cite: 1]
   },
-  peticao_aditamento: {
-    topic: 'Petição Inicial - Aditamento',
+  onus_cartoes: {
+    topic: 'Provas - Cartões de Ponto',
     level: 'Média',
     points: 20,
-    statementTpl: 'Até que momento o autor pode aditar ou alterar o pedido sem o consentimento do réu?',
+    statementTpl: 'O empregador que conta com mais de 20 empregados tem o dever probatório de apresentar quais documentos em juízo?', //[cite: 1]
     options: [
-      { letter: 'A', text: 'Até a citação do réu' },
-      { letter: 'B', text: 'Até o julgamento em segunda instância' },
-      { letter: 'C', text: 'Apenas na fase de execução' },
-      { letter: 'D', text: 'Até a apresentação do recurso ordinário' },
+      { letter: 'A', text: 'As notas fiscais de compra de equipamentos de proteção.' }, //[cite: 1]
+      { letter: 'B', text: 'Os controles de frequência/cartões de ponto do trabalhador.' }, //[cite: 1]
+      { letter: 'C', text: 'Os balancetes contábeis e fiscais dos últimos cinco anos.' }, //[cite: 1]
+      { letter: 'D', text: 'As certidões de regularidade fiscal do estabelecimento.' }, //[cite: 1]
     ],
-    correctLetter: 'A',
-    legalBasis: 'Art. 329, I do CPC c/c CLT: O autor pode aditar o pedido/causa de pedir até a citação sem consentimento; após, com anuência ou resguardo do contraditório.',
+    correctLetter: 'B', //[cite: 1]
+    legalBasis: 'Súmula 338, I do TST: É ônus do empregador que conta com mais de 20 empregados o registro da jornada de trabalho.', //[cite: 1]
   },
-  peticao_homeoffice: {
-    topic: 'Petição Inicial - Home Office',
-    level: 'Fácil',
-    points: 10,
-    statementTpl: 'Em caso de trabalho executado exclusivamente em home office em empresa com estrutura nacional, onde pode ser ajuizada a ação?',
-    options: [
-      { letter: 'A', text: 'Apenas na sede principal da empresa' },
-      { letter: 'B', text: 'No local de residência do trabalhador' },
-      { letter: 'C', text: 'Exclusivamente no Distrito Federal' },
-      { letter: 'D', text: 'Apenas no local de contratação inicial' },
-    ],
-    correctLetter: 'B',
-    legalBasis: 'Art. 651 da CLT e jurisprudência pacífica: Trabalho exclusivo em home office autoriza a fixação da competência no domicílio do empregado.',
-  },
-  contestacao_pje: {
-    topic: 'Contestação - Prazo no PJe',
-    level: 'Fácil',
-    points: 10,
-    statementTpl: 'Qual é o momento limite para a apresentação da contestação escrita no PJe?',
-    options: [
-      { letter: 'A', text: '15 dias após a citação' },
-      { letter: 'B', text: 'Até a audiência trabalhista (art. 847, parágrafo único da CLT)' },
-      { letter: 'C', text: 'Em até 30 dias úteis' },
-      { letter: 'D', text: 'Apenas após a tentativa infrutífera de perícia' },
-    ],
-    correctLetter: 'B',
-    legalBasis: 'Art. 847, parágrafo único da CLT: A defesa escrita pode ser enviada pelo PJe até a audiência. Não se aplica o prazo de 15 dias do CPC.',
-  },
-  contestacao_incompetencia: {
-    topic: 'Contestação - Exceção de Incompetência Territorial',
-    level: 'Média',
-    points: 20,
-    statementTpl: 'Qual é o prazo para a apresentação da exceção de incompetência territorial prevista no art. 800 da CLT?',
-    options: [
-      { letter: 'A', text: 'Em até 5 dias a contar da notificação, antes da audiência' },
-      { letter: 'B', text: 'Em até 15 dias após a audiência de instrução' },
-      { letter: 'C', text: 'Apenas na fase de razões finais' },
-      { letter: 'D', text: 'No prazo improrrogável de 8 dias após a sentença' },
-    ],
-    correctLetter: 'A',
-    legalBasis: 'Art. 800 da CLT: A incompetência territorial deve ser arguida por exceção em até 5 dias da notificação, em peça própria antes da audiência.',
-  },
-  contestacao_prescricao: {
-    topic: 'Contestação - Prescrição Trabalhista',
-    level: 'Média',
-    points: 20,
-    statementTpl: 'Quais são os prazos prescricionais bienal e quinquenal previstos na CF (art. 7º, XXIX) e CLT?',
-    options: [
-      { letter: 'A', text: '2 anos no curso do contrato e 5 anos após a rescisão' },
-      { letter: 'B', text: '5 anos durante o contrato até o limite de 2 anos após a extinção contratual' },
-      { letter: 'C', text: '3 anos para qualquer verba e 10 anos para FGTS' },
-      { letter: 'D', text: '1 ano após a rescisão e 4 anos retroativos' },
-    ],
-    correctLetter: 'B',
-    legalBasis: 'Art. 7º, XXIX da CF/88 e Art. 11 da CLT: Prescrição quinquenal durante o contrato, limitada a 2 anos após o término do vínculo.',
-  },
-  contestacao_declaratoria: {
-    topic: 'Contestação - Ação Declaratória',
-    level: 'Fácil',
-    points: 10,
-    statementTpl: 'Em relação à prescrição, as ações puramente declaratórias (como reconhecimento de vínculo na CTPS) são:',
-    options: [
-      { letter: 'A', text: 'Sujeitas ao prazo bienal rigoroso' },
-      { letter: 'B', text: 'Prescritíveis em 5 anos' },
-      { letter: 'C', text: 'Imprescritíveis' },
-      { letter: 'D', text: 'Sujeitas a caducidade em 30 dias' },
-    ],
-    correctLetter: 'C',
-    legalBasis: 'Art. 11, § 1º da CLT: As ações que tenham por objeto anotações para fins de prova junto à Previdência Social são imprescritíveis.',
-  },
-  contestacao_compensacao: {
-    topic: 'Contestação - Dedução vs Compensação',
-    level: 'Média',
-    points: 20,
-    statementTpl: 'A compensação de dívidas na Justiça do Trabalho (Súmula 18 do TST) restringe-se a:',
-    options: [
-      { letter: 'A', text: 'Dívidas de qualquer natureza civil ou comercial' },
-      { letter: 'B', text: 'Apenas dívidas de natureza estritamente trabalhista' },
-      { letter: 'C', text: 'Empréstimos bancários consignados' },
-      { letter: 'D', text: 'Danos morais causados a terceiros' },
-    ],
-    correctLetter: 'B',
-    legalBasis: 'Súmula 18 do TST: A compensação na Justiça do Trabalho está restrita a dívidas de natureza estritamente trabalhista.',
-  },
-  audiencia_testemunhas: {
-    topic: 'Audiência - Testemunhas no Ordinário',
-    level: 'Fácil',
-    points: 10,
-    statementTpl: 'Qual é o número máximo de testemunhas que cada parte pode indicar no rito ordinário?',
-    options: [
-      { letter: 'A', text: 'Até 2 testemunhas' },
-      { letter: 'B', text: 'Até 3 testemunhas' },
-      { letter: 'C', text: 'Até 6 testemunhas' },
-      { letter: 'D', text: 'Ilimitado' },
-    ],
-    correctLetter: 'B',
-    legalBasis: 'Art. 821 da CLT: Cada uma das partes não poderá indicar mais de 3 testemunhas no rito ordinário (no sumaríssimo são até 2 testemunhas).',
-  },
-  audiencia_ausencia: {
-    topic: 'Audiência - Ausência das Partes',
-    level: 'Média',
-    points: 20,
-    statementTpl: 'Na abertura da audiência, o que ocorre se o Reclamante estiver ausente e se a Reclamada estiver ausente?',
-    options: [
-      { letter: 'A', text: 'Reclamante ausente = revelia; Reclamada ausente = arquivamento' },
-      { letter: 'B', text: 'Reclamante ausente = arquivamento; Reclamada ausente = revelia e confissão' },
-      { letter: 'C', text: 'Ambos pagam multa de 10% e a audiência é remarcada' },
-      { letter: 'D', text: 'O processo é extinto com resolução do mérito imediatamente' },
-    ],
-    correctLetter: 'B',
-    legalBasis: 'Art. 844 da CLT: O não comparecimento do reclamante importa o arquivamento da reclamação, e o do reclamado importa revelia e confissão ficta.',
-  },
-  audiencia_contradita: {
-    topic: 'Audiência - Momento da Contradita',
-    level: 'Média',
-    points: 20,
-    statementTpl: 'Qual o momento processual exato para arguir a contradita de testemunha impedida ou suspeita?',
-    options: [
-      { letter: 'A', text: 'Nas razões finais escritas' },
-      { letter: 'B', text: 'Logo após a sentença de primeiro grau' },
-      { letter: 'C', text: 'Ao final da qualificação e antes de prestar o compromisso legal' },
-      { letter: 'D', text: 'Apenas no recurso ordinário' },
-    ],
-    correctLetter: 'C',
-    legalBasis: 'Art. 457, § 1º do CPC c/c Art. 769 da CLT: A contradita deve ser feita imediatamente após a qualificação e antes do compromisso, sob pena de preclusão.',
-  },
-  audiencia_protesto: {
-    topic: 'Audiência - Registro de Protesto',
-    level: 'Fácil',
-    points: 10,
-    statementTpl: 'Diante de um indeferimento de pergunta ou ato de cerceamento de defesa em audiência, o que o advogado deve requerer?',
-    options: [
-      { letter: 'A', text: 'Suspensão imediata da OAB do juiz' },
-      { letter: 'B', text: 'Registro de protesto em ata para evitar preclusão' },
-      { letter: 'C', text: 'Abandono do recinto de audiência' },
-      { letter: 'D', text: 'Interposição imediata de agravo de instrumento oral' },
-    ],
-    correctLetter: 'B',
-    legalBasis: 'Art. 795 da CLT: As nulidades devem ser arguidas na primeira oportunidade que couber à parte falar em audiência ou nos autos, mediante protesto em ata.',
-  },
-  audiencia_testemunha_acao: {
-    topic: 'Audiência - Testemunha com Ação contra Réu',
-    level: 'Média',
-    points: 20,
-    statementTpl: 'Segundo a Súmula 357 do TST, o fato de a testemunha estar litigando contra o mesmo empregador:',
-    options: [
-      { letter: 'A', text: 'A torna suspeita de forma absoluta' },
-      { letter: 'B', text: 'Não a torna suspeita por si só' },
-      { letter: 'C', text: 'Exige pagamento de caução prévia' },
-      { letter: 'D', text: 'Impede seu depoimento mesmo como informante' },
-    ],
-    correctLetter: 'B',
-    legalBasis: 'Súmula 357 do TST: Não torna suspeita a testemunha o simples fato de estar litigando ou de ter litigado contra o mesmo empregador.',
-  },
-  provas_onus: {
-    topic: 'Provas - Ônus da Prova Geral',
-    level: 'Fácil',
-    points: 10,
-    statementTpl: 'Nos termos do art. 818 da CLT, a quem incumbe o ônus da prova do fato constitutivo e do fato impeditivo/extintivo?',
-    options: [
-      { letter: 'A', text: 'Fato constitutivo ao réu; impeditivo ao autor' },
-      { letter: 'B', text: 'Fato constitutivo ao autor; impeditivo/modificativo/extintivo ao réu' },
-      { letter: 'C', text: 'Sempre ao juiz do trabalho' },
-      { letter: 'D', text: 'Exclusivamente ao Ministério Público do Trabalho' },
-    ],
-    correctLetter: 'B',
-    legalBasis: 'Art. 818 da CLT: O ônus da prova incumbe ao reclamante quanto ao fato constitutivo de seu direito, e ao reclamado quanto ao fato impeditivo, modificativo ou extintivo.',
-  },
-  provas_britanicos: {
-    topic: 'Provas - Cartões de Ponto Britânicos',
-    level: 'Média',
-    points: 20,
-    statementTpl: 'Conforme a Súmula 338, III do TST, cartões de ponto que demonstram horários de entrada e saída uniformes (britânicos):',
-    options: [
-      { letter: 'A', text: 'São válidos e fazem prova plena a favor da empresa' },
-      { letter: 'B', text: 'São inválidos como meio de prova, invertendo o ônus da prova para o empregador' },
-      { letter: 'C', text: 'Geram demissão por justa causa do empregado' },
-      { letter: 'D', text: 'Tornam a ação automaticamente procedente sem outras provas' },
-    ],
-    correctLetter: 'B',
-    legalBasis: 'Súmula 338, III do TST: Cartões com horários invariáveis são inválidos como meio de prova, invertendo-se o ônus quanto às horas extras.',
-  },
-  provas_pericia_sumarissimo: {
-    topic: 'Provas - Laudo Pericial no Sumaríssimo',
-    level: 'Média',
-    points: 20,
-    statementTpl: 'Após a juntada do laudo pericial no procedimento sumaríssimo (art. 852-H, §6º da CLT), qual o prazo comum para manifestação?',
-    options: [
-      { letter: 'A', text: '5 dias' },
-      { letter: 'B', text: '10 dias' },
-      { letter: 'C', text: '15 dias' },
-      { letter: 'D', text: '8 dias' },
-    ],
-    correctLetter: 'A',
-    legalBasis: 'Art. 852-H, § 6º da CLT: No rito sumaríssimo, sobre o laudo pericial as partes poderão manifestar-se no prazo comum de 5 dias.',
-  },
-  provas_juiz_laudo: {
-    topic: 'Provas - Vinculação do Juiz ao Laudo',
-    level: 'Fácil',
-    points: 10,
-    statementTpl: 'Em relação ao laudo pericial técnico, o juiz do trabalho:',
-    options: [
-      { letter: 'A', text: 'É obrigado a aceitar integralmente a conclusão do perito' },
-      { letter: 'B', text: 'Não fica adstrito ao laudo, podendo formar convicção por outros elementos' },
-      { letter: 'C', text: 'Deve anular o processo se discordar do perito' },
-      { letter: 'D', text: 'Deve consultar o Ministério do Trabalho para validar o laudo' },
-    ],
-    correctLetter: 'B',
-    legalBasis: 'Art. 479 do CPC c/c CLT: O juiz apreciará a prova pericial e não está adstrito ao laudo do perito, indicando os motivos do seu convencimento.',
-  },
-  provas_falsidade: {
-    topic: 'Provas - Arguição de Falsidade Documental',
-    level: 'Média',
-    points: 20,
-    statementTpl: 'Qual é o momento adequado para o Reclamante arguir o incidente de falsidade documental sobre os documentos juntados com a contestação?',
-    options: [
-      { letter: 'A', text: 'Apenas na fase de execução de sentença' },
-      { letter: 'B', text: 'No momento de se manifestar sobre os documentos (réplica escrita ou em audiência)' },
-      { letter: 'C', text: 'Após o trânsito em julgado via Ação Rescisória' },
-      { letter: 'D', text: 'No Recurso de Revista perante o TST' },
-    ],
-    correctLetter: 'B',
-    legalBasis: 'Art. 430 do CPC c/c CLT: A falsidade deve ser suscitada na contestação ou na réplica (primeira manifestação sobre os documentos).',
-  },
-  recursos_ed: {
-    topic: 'Embargos de Declaração - Prazo e Efeito',
-    level: 'Fácil',
-    points: 10,
-    statementTpl: 'Qual é o prazo para opor Embargos de Declaração (art. 897-A da CLT) e qual o seu efeito sobre os demais prazos recursais?',
-    options: [
-      { letter: 'A', text: 'Prazo de 8 dias; suspende os demais prazos' },
-      { letter: 'B', text: 'Prazo de 5 dias; interrompe o prazo para outros recursos' },
-      { letter: 'C', text: 'Prazo de 15 dias; não altera prazos' },
-      { letter: 'D', text: 'Prazo de 10 dias; extingue a ação' },
-    ],
-    correctLetter: 'B',
-    legalBasis: 'Art. 897-A da CLT: O prazo é de 5 dias e sua oposição interrompe o prazo para a interposição de outros recursos.',
-  },
-  recursos_ro_prazo: {
-    topic: 'Recurso Ordinário - Prazo e Cabimento',
-    level: 'Fácil',
-    points: 10,
-    statementTpl: 'Qual é o prazo legal para a interposição do Recurso Ordinário (art. 895 da CLT) contra decisões definitivas da Vara do Trabalho?',
-    options: [
-      { letter: 'A', text: '5 dias' },
-      { letter: 'B', text: '8 dias' },
-      { letter: 'C', text: '15 dias' },
-      { letter: 'D', text: '10 dias' },
-    ],
-    correctLetter: 'B',
-    legalBasis: 'Art. 895, I da CLT: Cabe Recurso Ordinário para a instância superior das decisões definitivas das Varas no prazo de 8 dias.',
-  },
-  recursos_ro_custas: {
-    topic: 'Recurso Ordinário - Custas Processuais',
-    level: 'Fácil',
-    points: 10,
-    statementTpl: 'As custas processuais no Processo do Trabalho (art. 789 da CLT) são fixadas em qual percentual?',
-    options: [
-      { letter: 'A', text: '1% sobre o valor da causa' },
-      { letter: 'B', text: '2% sobre o valor da condenação ou da causa' },
-      { letter: 'C', text: '5% sobre o valor arbitrado' },
-      { letter: 'D', text: '10% fixos' },
-    ],
-    correctLetter: 'B',
-    legalBasis: 'Art. 789 da CLT: As custas serão de 2% calculadas sobre o valor da condenação ou do acordo ou, não havendo, do valor da causa.',
-  },
-  recursos_ro_reducao: {
-    topic: 'Recurso Ordinário - Depósito Recursal ME/EPP/MEI',
+  desercao: {
+    topic: 'Recursos - Deserção',
     level: 'Difícil',
     points: 30,
-    statementTpl: 'De acordo com o art. 899, § 9º da CLT, o valor do depósito recursal é reduzido pela metade (50%) para:',
+    statementTpl: 'Qual é a consequência do não pagamento das custas e do depósito recursal no momento da interposição do R.O.?', //[cite: 1]
     options: [
-      { letter: 'A', text: 'Apenas empresas multinacionais e S/A' },
-      { letter: 'B', text: 'Entidades sem fins lucrativos, empregadores domésticos, MEI, ME e EPP' },
-      { letter: 'C', text: 'Todos os réus independente de porte' },
-      { letter: 'D', text: 'Apenas beneficiários da justiça gratuita' },
+      { letter: 'A', text: 'A conversão em dívida ativa sem prejuízo do recurso.' }, //[cite: 1]
+      { letter: 'B', text: 'A concessão automática de prazo suplementar de 15 dias.' }, //[cite: 1]
+      { letter: 'C', text: 'A remessa dos autos ao TST para julgamento direto.' }, //[cite: 1]
+      { letter: 'D', text: 'A deserção do recurso e seu não conhecimento.' }, //[cite: 1]
     ],
-    correctLetter: 'B',
-    legalBasis: 'Art. 899, § 9º da CLT: O valor do depósito recursal é reduzido pela metade para entidades sem fins lucrativos, empregadores domésticos, microempreendedores individuais, microempresas e empresas de pequeno porte.',
+    correctLetter: 'D', //[cite: 1]
+    legalBasis: 'Art. 899 da CLT c/c Súmula 245 do TST: O preparo deve ser comprovado dentro do prazo recursal, sob pena de deserção.', //[cite: 1]
   },
-  recursos_ro_isencao: {
-    topic: 'Recurso Ordinário - Isenção de Depósito',
-    level: 'Difícil',
-    points: 30,
-    statementTpl: 'Quem é ISENTO da obrigação do recolhimento de depósito recursal no processo do trabalho?',
-    options: [
-      { letter: 'A', text: 'Apenas empresas de grande porte em expansão' },
-      { letter: 'B', text: 'Beneficiários da Justiça Gratuita, entidades filantrópicas, empresas em recuperação judicial e massa falida' },
-      { letter: 'C', text: 'Qualquer reclamada que contestar o valor da causa' },
-      { letter: 'D', text: 'Sociedades anônimas de capital aberto' },
-    ],
-    correctLetter: 'B',
-    legalBasis: 'Art. 899, § 10 da CLT & Súmula 86 do TST: São isentos de depósito recursal os beneficiários da justiça gratuita, as entidades filantrópicas, empresas em recuperação judicial e massa falida.',
-  },
-  rr_julgador: {
-    topic: 'Recurso de Revista - Julgador e Prazo',
-    level: 'Difícil',
-    points: 30,
-    statementTpl: 'O Recurso de Revista é julgado por qual órgão judicial e qual seu prazo de interposição?',
-    options: [
-      { letter: 'A', text: 'Julgado pelo TRT no prazo de 15 dias' },
-      { letter: 'B', text: 'Julgado pelo TST no prazo de 8 dias' },
-      { letter: 'C', text: 'Julgado pelo STF no prazo de 5 dias' },
-      { letter: 'D', text: 'Julgado pela Vara de Origem no prazo de 10 dias' },
-    ],
-    correctLetter: 'B',
-    legalBasis: 'Art. 896 da CLT: O Recurso de Revista é dirigido às Turmas do TST no prazo legal unificado de 8 dias.',
-  },
-  rr_prequestionamento: {
-    topic: 'Recurso de Revista - Requisito do Prequestionamento',
-    level: 'Difícil',
-    points: 30,
-    statementTpl: 'Nos termos do art. 896, § 1º-A, I da CLT e Súmula 297 do TST, para demonstrar o prequestionamento a parte deve:',
-    options: [
-      { letter: 'A', text: 'Anexar cópia integral do processo em papel' },
-      { letter: 'B', text: 'Transcrever explicitamente nas razões o trecho do acórdão recorrido que consubstancia a controvérsia' },
-      { letter: 'C', text: 'Apresentar novo depoimento testemunhal ao TST' },
-      { letter: 'D', text: 'Pagar taxa extra de urgência regional' },
-    ],
-    correctLetter: 'B',
-    legalBasis: 'Art. 896, § 1º-A, I da CLT: Sob pena de não conhecimento, é ônus da parte indicar o trecho da decisão recorrida que consubstancia o prequestionamento.',
-  },
-  rr_transcendencia: {
+  transcendencia: {
     topic: 'Recurso de Revista - Transcendência',
-    level: 'Difícil',
-    points: 30,
-    statementTpl: 'Quais são os quatro indicadores de transcendência previstos no art. 896-A, § 1º da CLT para cabimento do Recurso de Revista?',
+    level: 'Média', // Adaptado pelo padrão da Casa 3[cite: 1]
+    points: 20,
+    statementTpl: 'No Recurso de Revista interposto perante o TST, qual das alternativas expressa uma exigência de admissibilidade?', //[cite: 1]
     options: [
-      { letter: 'A', text: 'Criminal, civil, eleitoral e tributária' },
-      { letter: 'B', text: 'Econômica, política, social e jurídica' },
-      { letter: 'C', text: 'Municipal, estadual, federal e internacional' },
-      { letter: 'D', text: 'Sumária, ordinária, executiva e cautelar' },
+      { letter: 'A', text: 'O depósito recursal em valor equivalente ao triplo do rito ordinário.' }, //[cite: 1]
+      { letter: 'B', text: 'A juntada obrigatória de três laudos periciais divergentes.' }, //[cite: 1]
+      { letter: 'C', text: 'A demonstração explícita da transcendência da matéria.' }, //[cite: 1]
+      { letter: 'D', text: 'A reanálise integral do conjunto fático-probatório dos autos.' }, //[cite: 1]
     ],
-    correctLetter: 'B',
-    legalBasis: 'Art. 896-A, § 1º da CLT: São indicadores de transcendência a econômica, a política, a social e a jurídica.',
-  },
-  rr_execucao: {
-    topic: 'Recurso de Revista - Fase de Execução',
-    level: 'Difícil',
-    points: 30,
-    statementTpl: 'Em regra, segundo o art. 896, § 2º da CLT, cabe Recurso de Revista na fase de execução de sentença?',
-    options: [
-      { letter: 'A', text: 'Cabe livremente para reapreciar provas' },
-      { letter: 'B', text: 'Não cabe, salvo na hipótese de ofensa direta e literal à Constituição Federal' },
-      { letter: 'C', text: 'Cabe sempre que o valor for superior a 100 salários' },
-      { letter: 'D', text: 'Cabe apenas se houver concordância do executado' },
-    ],
-    correctLetter: 'B',
-    legalBasis: 'Art. 896, § 2º da CLT e Súmula 266 do TST: Das decisões proferidas pelos TRTs em execução de sentença não caberá Recurso de Revista, salvo por ofensa direta e literal à Constituição Federal.',
+    correctLetter: 'C', //[cite: 1]
+    legalBasis: 'Art. 896-A da CLT: O TST examinará previamente se a causa oferece transcendência econômica, política, social ou jurídica.', //[cite: 1]
   },
   ap_cabimento: {
-    topic: 'Agravo de Petição - Cabimento e Prazo',
-    level: 'Média',
-    points: 20,
-    statementTpl: "Qual é o recurso cabível contra decisões do Juiz na fase de execução e qual seu prazo (art. 897, 'a' da CLT)?",
+    topic: 'Agravo de Petição - Cabimento',
+    level: 'Fácil', // Adaptado pelo padrão da Casa 3[cite: 1]
+    points: 10,
+    statementTpl: 'Na fase de execução, qual é o recurso cabível contra as decisões do Juiz ou Presidente nas execuções trabalhistas?', //[cite: 1]
     options: [
-      { letter: 'A', text: 'Recurso Ordinário no prazo de 15 dias' },
-      { letter: 'B', text: 'Agravo de Petição no prazo de 8 dias' },
-      { letter: 'C', text: 'Agravo de Instrumento no prazo de 5 dias' },
-      { letter: 'D', text: 'Mandado de Segurança no prazo de 120 dias' },
+      { letter: 'A', text: 'Agravo de Petição, no prazo de 8 dias.' }, //[cite: 1]
+      { letter: 'B', text: 'Agravo de Instrumento Executivo, no prazo de 5 dias.' }, //[cite: 1]
+      { letter: 'C', text: 'Recurso Ordinário de Execução, no prazo de 15 dias.' }, //[cite: 1]
+      { letter: 'D', text: 'Embargos à Execução Superior, no prazo de 10 dias.' }, //[cite: 1]
     ],
-    correctLetter: 'B',
-    legalBasis: "Art. 897, 'a' da CLT: Cabe agravo de petição, das decisões do Juiz ou Presidente, nas execuções, no prazo de 8 dias.",
-  },
-  ap_delimitacao: {
-    topic: 'Agravo de Petição - Delimitação de Matérias e Valores',
-    level: 'Difícil',
-    points: 30,
-    statementTpl: 'Para que o Agravo de Petição seja recebido (art. 897, § 1º da CLT), o que é exigido do agravante?',
-    options: [
-      { letter: 'A', text: 'Pagamento prévio de multa de 20%' },
-      { letter: 'B', text: 'Delimitação de forma justificada das matérias e dos valores impugnados' },
-      { letter: 'C', text: 'Renúncia a todos os recursos futuros' },
-      { letter: 'D', text: 'Assinatura pessoal de duas testemunhas' },
-    ],
-    correctLetter: 'B',
-    legalBasis: 'Art. 897, § 1º da CLT: O agravo de petição só será recebido se o agravante delimitar, justificadamente, as matérias e os valores impugnados.',
-  },
-  ap_incontroversa: {
-    topic: 'Agravo de Petição - Execução Incontroversa',
-    level: 'Média',
-    points: 20,
-    statementTpl: 'A exigência de delimitação de matérias e valores no Agravo de Petição permite:',
-    options: [
-      { letter: 'A', text: 'A anulação de todo o processo anterior' },
-      { letter: 'B', text: 'A execução imediata da parte incontroversa do débito' },
-      { letter: 'C', text: 'A liberação de todos os bens penhorados' },
-      { letter: 'D', text: 'O cancelamento automático das custas' },
-    ],
-    correctLetter: 'B',
-    legalBasis: 'Art. 897, § 1º da CLT: Permitida a execução imediata da parte remanescente incontroversa até o final.',
-  },
-  ap_garantia: {
-    topic: 'Agravo de Petição - Garantia do Juízo',
-    level: 'Difícil',
-    points: 30,
-    statementTpl: 'Conforme a Súmula 128, II do TST, estando o juízo na fase executória integralmente garantido por penhora ou depósito:',
-    options: [
-      { letter: 'A', text: 'Exige-se novo depósito recursal obrigatoriamente' },
-      { letter: 'B', text: 'Não há exigência de novo depósito recursal para recorrer de qualquer decisão' },
-      { letter: 'C', text: 'O devedor perde o direito de recorrer' },
-      { letter: 'D', text: 'O valor depositado é transferido ao Estado' },
-    ],
-    correctLetter: 'B',
-    legalBasis: 'Súmula 128, II do TST: Garantido o juízo na fase executória, a exigência de depósito para recorrer de qualquer decisão viola os incisos II e LV do art. 5º da CF/88.',
-  },
-  ap_custas: {
-    topic: 'Agravo de Petição - Custas Processuais',
-    level: 'Média',
-    points: 20,
-    statementTpl: 'As custas do Agravo de Petição (art. 789-A, IV da CLT) são fixadas em R$ 44,26 e devem ser recolhidas:',
-    options: [
-      { letter: 'A', text: 'Antecipadamente pelo exequente' },
-      { letter: 'B', text: 'Ao final pelo executado' },
-      { letter: 'C', text: 'Divididas em 10 parcelas mensais' },
-      { letter: 'D', text: 'Isentas para qualquer empresa' },
-    ],
-    correctLetter: 'B',
-    legalBasis: 'Art. 789-A, caput e inciso IV da CLT: No processo de execução são devidas custas de R$ 44,26 no agravo de petição, a serem recolhidas ao final pelo executado.',
-  },
+    correctLetter: 'A', //[cite: 1]
+    legalBasis: "Art. 897, 'a' da CLT: Cabe Agravo de Petição das decisões nas execuções, no prazo de 8 dias.", //[cite: 1]
+  }
 };
 
-// Map each of the 27 question tiles (2-4, 6-9, 11-14, 16-19, 21-24, 26-29, 31-34) to 5 distinct templates (Cartas A, B, C, D, E)
-// Total 27 * 5 = 135 questions.
-// Below is the mapped sequence exactly matching pages 1 to 35 of the grounded document:
+// Mapeamento das 27 casas (5 cartas por casa) utilizando a rotação exata das 7 perguntas base do documento[cite: 1]
 const TILE_CARDS_MAP: Record<number, string[]> = {
-  2: ['peticao_requisitos', 'peticao_sumarissimo', 'peticao_emenda', 'peticao_aditamento', 'peticao_homeoffice'],
-  3: ['contestacao_pje', 'contestacao_incompetencia', 'contestacao_prescricao', 'contestacao_declaratoria', 'contestacao_compensacao'],
-  4: ['audiencia_testemunhas', 'audiencia_ausencia', 'audiencia_contradita', 'audiencia_protesto', 'audiencia_testemunha_acao'],
-  6: ['provas_onus', 'provas_britanicos', 'provas_pericia_sumarissimo', 'provas_juiz_laudo', 'provas_falsidade'],
-  7: ['recursos_ed', 'recursos_ro_prazo', 'recursos_ro_custas', 'recursos_ro_reducao', 'recursos_ro_isencao'],
-  8: ['rr_julgador', 'rr_prequestionamento', 'rr_transcendencia', 'rr_execucao', 'ap_cabimento'],
-  9: ['ap_delimitacao', 'ap_incontroversa', 'ap_garantia', 'ap_custas', 'peticao_requisitos'],
-  11: ['peticao_sumarissimo', 'peticao_emenda', 'peticao_aditamento', 'peticao_homeoffice', 'contestacao_pje'],
-  12: ['contestacao_incompetencia', 'contestacao_prescricao', 'contestacao_declaratoria', 'contestacao_compensacao', 'audiencia_testemunhas'],
-  13: ['audiencia_ausencia', 'audiencia_contradita', 'audiencia_protesto', 'audiencia_testemunha_acao', 'provas_onus'],
-  14: ['provas_britanicos', 'provas_pericia_sumarissimo', 'provas_juiz_laudo', 'provas_falsidade', 'recursos_ed'],
-  16: ['recursos_ro_prazo', 'recursos_ro_custas', 'recursos_ro_reducao', 'recursos_ro_isencao', 'rr_julgador'],
-  17: ['rr_prequestionamento', 'rr_transcendencia', 'rr_execucao', 'ap_cabimento', 'ap_delimitacao'],
-  18: ['ap_incontroversa', 'ap_garantia', 'ap_custas', 'peticao_requisitos', 'peticao_sumarissimo'],
-  19: ['peticao_emenda', 'peticao_aditamento', 'peticao_homeoffice', 'contestacao_pje', 'contestacao_incompetencia'],
-  21: ['contestacao_prescricao', 'contestacao_declaratoria', 'contestacao_compensacao', 'audiencia_testemunhas', 'audiencia_ausencia'],
-  22: ['audiencia_contradita', 'audiencia_protesto', 'audiencia_testemunha_acao', 'provas_onus', 'provas_britanicos'],
-  23: ['provas_pericia_sumarissimo', 'provas_juiz_laudo', 'provas_falsidade', 'recursos_ed', 'recursos_ro_prazo'],
-  24: ['recursos_ro_custas', 'recursos_ro_reducao', 'recursos_ro_isencao', 'rr_julgador', 'rr_prequestionamento'],
-  26: ['rr_transcendencia', 'rr_execucao', 'ap_cabimento', 'ap_delimitacao', 'ap_incontroversa'],
-  27: ['ap_garantia', 'ap_custas', 'peticao_requisitos', 'peticao_sumarissimo', 'peticao_emenda'],
-  28: ['peticao_aditamento', 'peticao_homeoffice', 'contestacao_pje', 'contestacao_incompetencia', 'contestacao_prescricao'],
-  29: ['contestacao_declaratoria', 'contestacao_compensacao', 'audiencia_testemunhas', 'audiencia_ausencia', 'audiencia_contradita'],
-  31: ['audiencia_protesto', 'audiencia_testemunha_acao', 'provas_onus', 'provas_britanicos', 'provas_pericia_sumarissimo'],
-  32: ['provas_juiz_laudo', 'provas_falsidade', 'recursos_ed', 'recursos_ro_prazo', 'recursos_ro_custas'],
-  33: ['recursos_ro_reducao', 'recursos_ro_isencao', 'rr_julgador', 'rr_prequestionamento', 'rr_transcendencia'],
-  34: ['rr_execucao', 'ap_cabimento', 'ap_delimitacao', 'ap_incontroversa', 'ap_garantia'],
+  2: ['prazo_ro', 'testemunhas_sum', 'ausencia_reclamante', 'onus_cartoes', 'desercao'],
+  3: ['transcendencia', 'ap_cabimento', 'prazo_ro', 'testemunhas_sum', 'ausencia_reclamante'],
+  4: ['onus_cartoes', 'desercao', 'transcendencia', 'ap_cabimento', 'prazo_ro'],
+  6: ['testemunhas_sum', 'ausencia_reclamante', 'onus_cartoes', 'desercao', 'transcendencia'],
+  7: ['ap_cabimento', 'prazo_ro', 'testemunhas_sum', 'ausencia_reclamante', 'onus_cartoes'],
+  8: ['desercao', 'transcendencia', 'ap_cabimento', 'prazo_ro', 'testemunhas_sum'],
+  9: ['ausencia_reclamante', 'onus_cartoes', 'desercao', 'transcendencia', 'ap_cabimento'],
+  11: ['prazo_ro', 'testemunhas_sum', 'ausencia_reclamante', 'onus_cartoes', 'desercao'],
+  12: ['transcendencia', 'ap_cabimento', 'prazo_ro', 'testemunhas_sum', 'ausencia_reclamante'],
+  13: ['onus_cartoes', 'desercao', 'transcendencia', 'ap_cabimento', 'prazo_ro'],
+  14: ['testemunhas_sum', 'ausencia_reclamante', 'onus_cartoes', 'desercao', 'transcendencia'],
+  16: ['ap_cabimento', 'prazo_ro', 'testemunhas_sum', 'ausencia_reclamante', 'onus_cartoes'],
+  17: ['desercao', 'transcendencia', 'ap_cabimento', 'prazo_ro', 'testemunhas_sum'],
+  18: ['ausencia_reclamante', 'onus_cartoes', 'desercao', 'transcendencia', 'ap_cabimento'],
+  19: ['prazo_ro', 'testemunhas_sum', 'ausencia_reclamante', 'onus_cartoes', 'desercao'],
+  21: ['transcendencia', 'ap_cabimento', 'prazo_ro', 'testemunhas_sum', 'ausencia_reclamante'],
+  22: ['onus_cartoes', 'desercao', 'transcendencia', 'ap_cabimento', 'prazo_ro'],
+  23: ['testemunhas_sum', 'ausencia_reclamante', 'onus_cartoes', 'desercao', 'transcendencia'],
+  24: ['ap_cabimento', 'prazo_ro', 'testemunhas_sum', 'ausencia_reclamante', 'onus_cartoes'],
+  26: ['desercao', 'transcendencia', 'ap_cabimento', 'prazo_ro', 'testemunhas_sum'],
+  27: ['ausencia_reclamante', 'onus_cartoes', 'desercao', 'transcendencia', 'ap_cabimento'],
+  28: ['prazo_ro', 'testemunhas_sum', 'ausencia_reclamante', 'onus_cartoes', 'desercao'],
+  29: ['transcendencia', 'ap_cabimento', 'prazo_ro', 'testemunhas_sum', 'ausencia_reclamante'],
+  31: ['onus_cartoes', 'desercao', 'transcendencia', 'ap_cabimento', 'prazo_ro'],
+  32: ['testemunhas_sum', 'ausencia_reclamante', 'onus_cartoes', 'desercao', 'transcendencia'],
+  33: ['ap_cabimento', 'prazo_ro', 'testemunhas_sum', 'ausencia_reclamante', 'onus_cartoes'],
+  34: ['desercao', 'transcendencia', 'ap_cabimento', 'prazo_ro', 'testemunhas_sum'],
 };
 
-// Generate the 135 regular questions (5 per question tile)
 export const REGULAR_QUESTIONS: ManualQuestion[] = [];
 let questionCounter = 1;
-
 const CARD_LETTERS: ('A' | 'B' | 'C' | 'D' | 'E')[] = ['A', 'B', 'C', 'D', 'E'];
 
 for (const tileIdStr of Object.keys(TILE_CARDS_MAP)) {
@@ -551,7 +170,7 @@ for (const tileIdStr of Object.keys(TILE_CARDS_MAP)) {
   });
 }
 
-// 7 Superperguntas de Chegada (Casa 35) - 100 Pontos cada (Perguntas #136 a #142)
+// 7 Superperguntas do Desafio Final exatas do documento oficial[cite: 1]
 export const FINISH_SUPER_QUESTIONS: ManualQuestion[] = [
   {
     questionNumber: 136,
@@ -559,16 +178,16 @@ export const FINISH_SUPER_QUESTIONS: ManualQuestion[] = [
     cardLetter: 'CHEGADA-1',
     level: 'Superpergunta',
     points: 100,
-    topic: 'Desafio Final de Chegada',
-    statement: 'SUPERPERGUNTA 1 (CASA 35): Na fase de execução, a executada interpôs Agravo de Petição impugnando parte dos cálculos. Para o conhecimento do recurso, qual a conduta legal indispensável?',
+    topic: 'Desafio Final - Execução',
+    statement: 'SUPERPERGUNTA 1 (CASA 35): Na fase de execução trabalhista, a empresa executada interpôs Agravo de Petição impugnando os cálculos de liquidação. Qual é o requisito essencial exigido pelo art. 897, § 1º da CLT para o recebimento deste recurso?', //[cite: 1]
     options: [
-      { letter: 'A', text: 'Realização de novo depósito recursal de 20% do valor da condenação.' },
-      { letter: 'B', text: 'Delimitação justificada das matérias e valores impugnados (art. 897, § 1º da CLT).' },
-      { letter: 'C', text: 'Pagamento prévio de custas de 5% sobre o valor exequendo.' },
-      { letter: 'D', text: 'Apresentação de fiador bancário exclusivo.' },
+      { letter: 'A', text: 'A delimitação justificada das matérias e dos valores impugnados, permitindo a execução imediata da parte incontroversa.' }, //[cite: 1]
+      { letter: 'B', text: 'A concordância expressa do exequente quanto ao processamento da peça.' }, //[cite: 1]
+      { letter: 'C', text: 'A apresentação de fiança bancária obrigatoriamente prestada por instituição pública.' }, //[cite: 1]
+      { letter: 'D', text: 'O depósito recursal equivalente a 20% do valor total da condenação atualizada.' }, //[cite: 1]
     ],
-    correctLetter: 'B',
-    legalBasis: 'Art. 897, § 1º da CLT - A delimitação de matérias e valores permite a execução imediata da parte incontroversa do débito.',
+    correctLetter: 'A', //[cite: 1]
+    legalBasis: 'Art. 897, § 1º da CLT: O agravo de petição só será recebido se o agravante delimitar, justificadamente, as matérias e os valores impugnados.', //[cite: 1]
   },
   {
     questionNumber: 137,
@@ -576,16 +195,16 @@ export const FINISH_SUPER_QUESTIONS: ManualQuestion[] = [
     cardLetter: 'CHEGADA-2',
     level: 'Superpergunta',
     points: 100,
-    topic: 'Desafio Final de Chegada',
-    statement: 'SUPERPERGUNTA 2 (CASA 35): No Recurso de Revista, para demonstrar a TRANSCENDÊNCIA POLÍTICA (art. 896-A, § 1º, II da CLT), a parte deve comprovar:',
+    topic: 'Desafio Final - Recurso de Revista',
+    statement: 'SUPERPERGUNTA 2 (CASA 35): Diante de acórdão proferido por Tribunal Regional do Trabalho em Recurso Ordinário, a parte deseja interpor Recurso de Revista ao TST. Segundo a Súmula 126 do TST, qual é a limitação cognitiva desse recurso?', //[cite: 1]
     options: [
-      { letter: 'A', text: 'O elevado valor econômico da causa superior a 1.000 salários.' },
-      { letter: 'B', text: 'O desrespeito da instância recorrida à jurisprudência sumulada do TST ou STF.' },
-      { letter: 'C', text: 'A existência de greve nacional na categoria profissional.' },
-      { letter: 'D', text: 'O pedido exclusivo de adicional de periculosidade.' },
+      { letter: 'A', text: 'A obrigatoriedade de pagamento em dobro do depósito recursal para julgamento.' }, //[cite: 1]
+      { letter: 'B', text: 'A exigência de manifestação do Ministério Público do Trabalho antes da distribuição.' }, //[cite: 1]
+      { letter: 'C', text: 'A impossibilidade de reexame de fatos e provas no âmbito do Recurso de Revista.' }, //[cite: 1]
+      { letter: 'D', text: 'A proibição de alegação de violação direta à Constituição Federal.' }, //[cite: 1]
     ],
-    correctLetter: 'B',
-    legalBasis: 'Art. 896-A, § 1º, II da CLT - A transcendência política decorre expressamente do desrespeito da decisão recorrida à jurisprudência sumulada do TST ou acórdão do STF.',
+    correctLetter: 'C', //[cite: 1]
+    legalBasis: 'Súmula 126 do TST: Incabível o recurso de revista para reexame de fatos e provas.', //[cite: 1]
   },
   {
     questionNumber: 138,
@@ -593,16 +212,16 @@ export const FINISH_SUPER_QUESTIONS: ManualQuestion[] = [
     cardLetter: 'CHEGADA-3',
     level: 'Superpergunta',
     points: 100,
-    topic: 'Desafio Final de Chegada',
-    statement: 'SUPERPERGUNTA 3 (CASA 35): Em relação ao PREPARO RECURSAL, a insuficiência no recolhimento do depósito recursal ou das custas autoriza a deserção imediata?',
+    topic: 'Desafio Final - Transcendência',
+    statement: 'SUPERPERGUNTA 3 (CASA 35): Em relação ao instituto da Transcêndência no Recurso de Revista (art. 896-A da CLT), assinale a alternativa que apresenta um indicador válido de transcendência política:', //[cite: 1]
     options: [
-      { letter: 'A', text: 'Sim, no processo do trabalho a deserção é sempre automática sem intimação.' },
-      { letter: 'B', text: 'Não, concede-se o prazo de 5 dias para complementação do valor (OJ 140 SDI-1 / Art. 1.007, §2º CPC).' },
-      { letter: 'C', text: 'Não, concede-se o prazo de 30 dias para novo cálculo.' },
-      { letter: 'D', text: 'Sim, salvo se a parte for pessoa jurídica de direito privado.' },
+      { letter: 'A', text: 'A postulação de direito social constitucionalmente assegurado aos trabalhadores.' }, //[cite: 1]
+      { letter: 'B', text: 'O desrespeito do acórdão recorrido à jurisprudência sumulada do TST ou do STF.' }, //[cite: 1]
+      { letter: 'C', text: 'O valor da causa superior a 1.000 salários-mínimos na data da distribuição.' }, //[cite: 1]
+      { letter: 'D', text: 'A existência de dúvida jurídica inédita sem qualquer precedente nos Tribunais.' }, //[cite: 1]
     ],
-    correctLetter: 'B',
-    legalBasis: 'OJ 140 da SDI-I do TST & Art. 1.007, § 2º do CPC: Em caso de recolhimento insuficiente de custas ou depósito, assina-se prazo improrrogável de 5 dias para a complementação.',
+    correctLetter: 'B', //[cite: 1]
+    legalBasis: 'Art. 896-A, § 1º, II da CLT: É indicador de transcendência política o desrespeito à jurisprudência sumulada do TST ou STF.', //[cite: 1]
   },
   {
     questionNumber: 139,
@@ -610,16 +229,16 @@ export const FINISH_SUPER_QUESTIONS: ManualQuestion[] = [
     cardLetter: 'CHEGADA-4',
     level: 'Superpergunta',
     points: 100,
-    topic: 'Desafio Final de Chegada',
-    statement: 'SUPERPERGUNTA 4 (CASA 35): Quanto ao ÔNUS DA PROVA DA JORNADA, a não apresentação injustificada dos controles de frequência por empresa com mais de 10 empregados gera:',
+    topic: 'Desafio Final - Incompetência',
+    statement: 'SUPERPERGUNTA 4 (CASA 35): No tocante à exceção de incompetência territorial no Processo do Trabalho (art. 800 da CLT), qual é o procedimento e prazo correto para sua apresentação pelo réu?', //[cite: 1]
     options: [
-      { letter: 'A', text: 'Confissão criminal do empregador.' },
-      { letter: 'B', text: 'Presunção relativa de veracidade da jornada alegada na inicial (Súmula 338, I do TST).' },
-      { letter: 'C', text: 'Nulidade absoluta de todos os atos processuais.' },
-      { letter: 'D', text: 'Extinção da ação sem julgamento de mérito.' },
+      { letter: 'A', text: 'Arguição verbal obrigatoriamente na abertura da audiência una de instrução.' }, //[cite: 1]
+      { letter: 'B', text: 'Ajuizamento de ação autônoma no TRT no prazo de 8 dias contados da citação.' }, //[cite: 1]
+      { letter: 'C', text: 'Oferecimento em preliminar de contestação no prazo de 15 dias após a audiência.' }, //[cite: 1]
+      { letter: 'D', text: 'Apresentação em peça própria no prazo de 5 dias a contar da notificação, antes da audiência.' }, //[cite: 1]
     ],
-    correctLetter: 'B',
-    legalBasis: 'Súmula 338, I do TST: A não apresentação injustificada dos cartões gera presunção relativa de veracidade da jornada, que pode ser elidida por prova em contrário.',
+    correctLetter: 'D', //[cite: 1]
+    legalBasis: 'Art. 800 da CLT: Protocolada a petição no prazo de 5 dias contados da notificação, antes da audiência, o processo será suspenso.', //[cite: 1]
   },
   {
     questionNumber: 140,
@@ -627,16 +246,16 @@ export const FINISH_SUPER_QUESTIONS: ManualQuestion[] = [
     cardLetter: 'CHEGADA-5',
     level: 'Superpergunta',
     points: 100,
-    topic: 'Desafio Final de Chegada',
-    statement: 'SUPERPERGUNTA 5 (CASA 35): O EFEITO MODIFICATIVO (infringente) em Embargos de Declaração (art. 897-A, § 2º da CLT) somente pode ser concedido desde que:',
+    topic: 'Desafio Final - Depósito Recursal',
+    statement: 'SUPERPERGUNTA 5 (CASA 35): Conforme a Consolidação das Leis do Trabalho (art. 899, § 9º), qual benefício é concedido às entidades sem fins lucrativos, empregadores domésticos e microempresas quanto ao depósito recursal?', //[cite: 1]
     options: [
-      { letter: 'A', text: 'O embargante pague taxa judicial de 10%.' },
-      { letter: 'B', text: 'Seja ouvida a parte contrária no prazo de 5 dias.' },
-      { letter: 'C', text: 'O Tribunal Pleno aprove por maioria qualificada de 2/3.' },
-      { letter: 'D', text: 'Haja concordância prévia do Ministério Público do Trabalho.' },
+      { letter: 'A', text: 'A redução do valor do depósito recursal pela metade (50%).' }, //[cite: 1]
+      { letter: 'B', text: 'A isenção total e incondicional do pagamento do depósito recursal e das custas.' }, //[cite: 1]
+      { letter: 'C', text: 'A dilatação do prazo recursal para 16 dias úteis com dispensa de preparo.' }, //[cite: 1]
+      { letter: 'D', text: 'A substituição do depósito por prestação de serviços comunitários.' }, //[cite: 1]
     ],
-    correctLetter: 'B',
-    legalBasis: 'Art. 897-A, § 2º da CLT: A concessão de efeito modificativo aos embargos de declaração exige a prévia intimação do embargado para manifestação no prazo de 5 dias.',
+    correctLetter: 'A', //[cite: 1]
+    legalBasis: 'Art. 899, § 9º da CLT: O valor do depósito recursal será reduzido pela metade para entidades sem fins lucrativos, MEI, ME e EPP.', //[cite: 1]
   },
   {
     questionNumber: 141,
@@ -644,16 +263,16 @@ export const FINISH_SUPER_QUESTIONS: ManualQuestion[] = [
     cardLetter: 'CHEGADA-6',
     level: 'Superpergunta',
     points: 100,
-    topic: 'Desafio Final de Chegada',
-    statement: 'SUPERPERGUNTA 6 (CASA 35): Na audiência trabalhista, se a testemunha for parente até o 3º grau ou amiga íntima da parte, a parte contrária deve arguir:',
+    topic: 'Desafio Final - Embargos de Declaração',
+    statement: 'SUPERPERGUNTA 6 (CASA 35): Em sede de Embargos de Declaração no Processo do Trabalho (art. 897-A da CLT), quando a acolhida dos embargos implicar modificação do julgado (efeito modificativo), qual medida deve ser adotada pelo juiz?', //[cite: 1]
     options: [
-      { letter: 'A', text: 'Exceção de suspeição do juiz.' },
-      { letter: 'B', text: 'Contradita por impedimento ou suspeição, antes de prestado o compromisso legal.' },
-      { letter: 'C', text: 'Agravo de instrumento oral no prazo de 24 horas.' },
-      { letter: 'D', text: 'Pedido de prisão preventiva em ata.' },
+      { letter: 'A', text: 'Proferir nova sentença imediatamente sem necessidade de ouvir a parte contrária.' }, //[cite: 1]
+      { letter: 'B', text: 'Anular todo o processo e determinar o refazimento da audiência de instrução.' }, //[cite: 1]
+      { letter: 'C', text: 'Conceder prazo de 5 dias para que a parte contrária se manifeste, em atenção ao contraditório.' }, //[cite: 1]
+      { letter: 'D', text: 'Encaminhar os autos diretamente ao TRT para ratificação da alteração.' }, //[cite: 1]
     ],
-    correctLetter: 'B',
-    legalBasis: 'Art. 457, § 1º do CPC c/c CLT: A contradita por impedimento ou suspeição deve ser alegada após a qualificação e antes de prestado o compromisso da testemunha.',
+    correctLetter: 'C', //[cite: 1]
+    legalBasis: 'Orientação Jurisprudencial 142 da SDI-1 / Súmula 278 do TST: É passível de nulidade a decisão que acolhe ED com efeito modificativo sem oportunidade de contraditório em 5 dias.', //[cite: 1]
   },
   {
     questionNumber: 142,
@@ -661,108 +280,21 @@ export const FINISH_SUPER_QUESTIONS: ManualQuestion[] = [
     cardLetter: 'CHEGADA-7',
     level: 'Superpergunta',
     points: 100,
-    topic: 'Desafio Final de Chegada',
-    statement: 'SUPERPERGUNTA 7 (CASA 35): Nos termos da Súmula 128, II do TST, na fase de execução, estando o juízo devidamente garantido por penhora:',
+    topic: 'Desafio Final - Ônus da Prova',
+    statement: 'SUPERPERGUNTA 7 (CASA 35): Quanto à distribuição do ônus da prova no Processo do Trabalho (art. 818 da CLT), se o réu alega fato impeditivo, modificativo ou extintivo do direito do autor (ex: quitação mediante recibo), a quem incumbe o ônus de provar?', //[cite: 1]
     options: [
-      { letter: 'A', text: 'É obrigatório recolher novo depósito para cada agravo interposto.' },
-      { letter: 'B', text: 'A exigência de novo depósito recursal para recorrer viola os incisos II e LV do art. 5º da CF/88.' },
-      { letter: 'C', text: 'O executado perde o direito de apresentar impugnação aos cálculos.' },
-      { letter: 'D', text: 'Exige-se depósito em dobro para o TRT.' },
+      { letter: 'A', text: 'Ao autor/reclamante, que sempre deve comprovar a invalidade de todos os recibos.' }, //[cite: 1]
+      { letter: 'B', text: 'Ao réu/reclamado, por se tratar de fato impeditivo, modificativo ou extintivo.' }, //[cite: 1]
+      { letter: 'C', text: 'Ao Ministério Público do Trabalho, mediante auditoria documental obrigatória.' }, //[cite: 1]
+      { letter: 'D', text: 'Ao perito judicial nomeado pelo juiz para fiscalização das contas.' }, //[cite: 1]
     ],
-    correctLetter: 'B',
-    legalBasis: 'Súmula 128, II do TST: Garantido integralmente o juízo na execução, descabe a exigência de novo depósito recursal para recorrer, sob pena de violação constitucional.',
-  },
-  {
-    questionNumber: 143,
-    tileId: 35,
-    cardLetter: 'CHEGADA-8',
-    level: 'Superpergunta',
-    points: 100,
-    topic: 'Desafio Final de Chegada',
-    statement: 'SUPERPERGUNTA 8 (CASA 35): Conforme a Súmula 443 do TST, presume-se DISCRIMINATÓRIA a despedida de empregado portador do vírus HIV ou de outra doença grave que suscite estigma ou preconceito. O direito reconhecido ao trabalhador é:',
-    options: [
-      { letter: 'A', text: 'Apenas indenização por danos morais fixada em 1 salário mínimo.' },
-      { letter: 'B', text: 'Reintegração no emprego com pagamento integral dos salários do período de afastamento.' },
-      { letter: 'C', text: 'Aposentadoria compulsória imediata paga pelo empregador.' },
-      { letter: 'D', text: 'Rescisão indireta sem direito a levantar o FGTS.' },
-    ],
-    correctLetter: 'B',
-    legalBasis: 'Súmula 443 do TST: Presume-se discriminatória a dispensa de empregado portador do HIV ou de outra doença grave que suscite estigma; inválido o ato, o empregado tem direito à reintegração com remuneração integral.',
-  },
-  {
-    questionNumber: 144,
-    tileId: 35,
-    cardLetter: 'CHEGADA-9',
-    level: 'Superpergunta',
-    points: 100,
-    topic: 'Desafio Final de Chegada',
-    statement: 'SUPERPERGUNTA 9 (CASA 35): No julgamento do Tema 725 da Repercussão Geral (ADPF 324), o Supremo Tribunal Federal fixou a tese de que:',
-    options: [
-      { letter: 'A', text: 'É absolutamente proibida a terceirização na atividade-fim das empresas.' },
-      { letter: 'B', text: 'É lícita a terceirização ou qualquer outra forma de divisão do trabalho entre pessoas jurídicas distintas, independentemente do objeto social das empresas envolvidas.' },
-      { letter: 'C', text: 'A terceirização só é permitida mediante autorização expressa do MPT.' },
-      { letter: 'D', text: 'Toda pejotização gera automaticamente vínculo de emprego irrecorrível.' },
-    ],
-    correctLetter: 'B',
-    legalBasis: 'STF - Tema 725 / ADPF 324: É lícita a terceirização de qualquer atividade, meio ou fim, não se configurando relação de emprego entre a contratante e os empregados da contratada, mantida a responsabilidade subsidiária.',
-  },
-  {
-    questionNumber: 145,
-    tileId: 35,
-    cardLetter: 'CHEGADA-10',
-    level: 'Superpergunta',
-    points: 100,
-    topic: 'Desafio Final de Chegada',
-    statement: 'SUPERPERGUNTA 10 (CASA 35): A Súmula Vinculante 13 do STF proíbe a prática do NEPOTISMO no serviço público. Essa vedação alcança a nomeação de parentes até qual grau na linha reta, colateral ou por afinidade?',
-    options: [
-      { letter: 'A', text: 'Até o 1º grau apenas (pais e filhos).' },
-      { letter: 'B', text: 'Até o 2º grau (irmãos e avós).' },
-      { letter: 'C', text: 'Até o 3º grau (inclusive tios e sobrinhos).' },
-      { letter: 'D', text: 'Até o 4º grau (primos).' },
-    ],
-    correctLetter: 'C',
-    legalBasis: 'Súmula Vinculante 13 do STF: A nomeação de cônjuge, companheiro ou parente em linha reta, colateral ou por afinidade, até o 3º grau, inclusive, viola a Constituição Federal.',
-  },
-  {
-    questionNumber: 146,
-    tileId: 35,
-    cardLetter: 'CHEGADA-11',
-    level: 'Superpergunta',
-    points: 100,
-    topic: 'Desafio Final de Chegada',
-    statement: 'SUPERPERGUNTA 11 (CASA 35): Diante do princípio da continuidade da relação de emprego (Súmula 212 do TST), quando o empregador nega a despedida e alega abandono ou pedido de demissão, o ônus da prova pertence ao:',
-    options: [
-      { letter: 'A', text: 'Empregado, sob pena de extinção do feito.' },
-      { letter: 'B', text: 'Empregador, pois o término do contrato constitui fato modificativo ou extintivo do direito pleiteado.' },
-      { letter: 'C', text: 'Sindicato da categoria laboral.' },
-      { letter: 'D', text: 'Ministério do Trabalho e Emprego.' },
-    ],
-    correctLetter: 'B',
-    legalBasis: 'Súmula 212 do TST: O ônus de provar o término do contrato de trabalho, quando negados a prestação de serviço e o despedimento, é do empregador, pois o princípio da continuidade presume a relação laboral.',
-  },
-  {
-    questionNumber: 147,
-    tileId: 35,
-    cardLetter: 'CHEGADA-12',
-    level: 'Superpergunta',
-    points: 100,
-    topic: 'Desafio Final de Chegada',
-    statement: 'SUPERPERGUNTA 12 (CASA 35): Segundo o Tema 497 do STF (RE 629.053), a ESTABILIDADE PROVISÓRIA da gestante (art. 10, II, "b", do ADCT) exige como pressuposto objetivo tão somente:',
-    options: [
-      { letter: 'A', text: 'A comunicação prévia e por escrito ao empregador antes da dispensa.' },
-      { letter: 'B', text: 'A confirmação do estado de gravidez na vigência do contrato de trabalho, sendo irrelevante o conhecimento prévio pelo empregador.' },
-      { letter: 'C', text: 'Que o contrato de trabalho tenha duração superior a 2 anos.' },
-      { letter: 'D', text: 'A realização de exame admissional com atestado de pré-natal.' },
-    ],
-    correctLetter: 'B',
-    legalBasis: 'STF - Tema 497: A incidência da estabilidade da gestante (ADCT, art. 10, II, "b") pressupõe a confirmação biológica da gravidez na constância do contrato, sendo prescindível a ciência do empregador.',
+    correctLetter: 'B', //[cite: 1]
+    legalBasis: 'Art. 818, II da CLT: O ônus da prova incumbe ao réu, quanto à existência de fato impeditivo, modificativo ou extintivo do direito do autor.', //[cite: 1]
   },
 ];
 
-// All 147 questions accessible by questionNumber
 export const ALL_QUESTIONS: ManualQuestion[] = [...REGULAR_QUESTIONS, ...FINISH_SUPER_QUESTIONS];
 
-// Helper to get questions for a specific tile
 export function getQuestionsForTile(tileId: number): ManualQuestion[] {
   if (tileId === 35) {
     return FINISH_SUPER_QUESTIONS;
